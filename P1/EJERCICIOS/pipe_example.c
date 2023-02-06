@@ -1,3 +1,17 @@
+/**
+ * @file pipe_example.c
+ * @author your name (you@domain.com)
+ * @brief 
+ * @version 0.1
+ * @date 2023-02-06
+ * 
+ * @copyright Copyright (c) 2023
+ * 
+ * a) Ejecutar el codigo. ¿Qu ́e se imprime por pantalla?
+ * 
+ * b) ¿Que ocurre si el proceso padre no cierra el extremo de escritura? ¿Por que?
+ * 
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

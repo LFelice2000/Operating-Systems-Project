@@ -1,3 +1,24 @@
+/**
+ * @file thread_example.c
+ * @author your name (you@domain.com)
+ * @brief 
+ * @version 0.1
+ * @date 2023-02-06
+ * 
+ * @copyright Copyright (c) 2023
+ * 
+ * a) ¿Que hubiera pasado si el proceso no hubiera esperado a los hilos? Para probarlo
+ * basta eliminar las llamadas a pthread_join.
+ * 
+ * b) Con el codigo modificado del apartado anterior, indicar que ocurre si se reemplaza
+ * la funcion exit por una llamada a pthread_exit
+ * 
+ * c) Tras eliminar las llamadas a pthread_join en los apartados anteriores, el programa
+ * no espera a que terminen todos los hilos. ¿Que codigo habrıa que anadir para que
+ * los recursos del sistema operativo se gestionen correctamente a pesar de que no se
+ * espere a los hilos creados?
+ * 
+ */
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>

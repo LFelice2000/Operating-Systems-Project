@@ -1,3 +1,18 @@
+/**
+ * @file proc_exec.c
+ * @author your name (you@domain.com)
+ * @brief 
+ * @version 0.1
+ * @date 2023-02-06
+ * 
+ * @copyright Copyright (c) 2023
+ * 
+ * a) ¿Que sucede si se sustituye el primer elemento del array argv por la cadena "mi-ls"? ¿Por que?
+ * 
+ * b) ¿Que modificaciones habr ́ıa que hacer en el programa anterior para utilizar la funcion
+ * execl en lugar de execvp?
+ * 
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/wait.h>
