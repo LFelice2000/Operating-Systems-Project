@@ -8,7 +8,7 @@ pow.o: pow.c
 minero.o: minero.c
 	gcc -c minero.c
 
-minero: minero.o
+minero: minero.o pow.o
 	gcc -o minero minero.o pow.o
 
 clean:
