@@ -35,6 +35,7 @@ pthread_t* create_threads(int num_threads, int obj) {
     /**Creo un array para guardar los hilos*/
     hilos = (pthread_t *)malloc(num_threads*sizeof(pthread_t));
     
+    /**Creo y lanzo los hilos*/
     for(i = 0; i < num_threads; i++) {
 
         err = pthread_create(&hilos[i], NULL, prueba_de_fuerza, &obj);
@@ -46,7 +47,7 @@ pthread_t* create_threads(int num_threads, int obj) {
         }
     }
 
-
+    /**Espero que terminen los hilos*/
     for(i = 0; i < num_threads; i++) {
 
         err = pthread_join(hilos[i], (void **)&thread_result);
