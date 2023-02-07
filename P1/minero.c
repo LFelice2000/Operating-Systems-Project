@@ -5,62 +5,83 @@
 #include <unistd.h>
 #include "pow.h"
 
-pthread_t** create_threads(int num_threads,int obj);
-void free_threads_memory(pthread_t** hilos, int num_hilos);
+pthread_t* create_threads(int num_threads,int obj);
+void *prueba_de_fuerza(void *obj);
 
 int main(int argc, char** argv) {
     long int test = 0;
     pthread_t** hilos = NULL;
+    int rounds = 0, num_threads = 0, obj = 0;
 
-    if(argc != 3) {
+    if(argc != 4) {
         fprintf(stderr, "Error: debes escribir ./minero <numero de rondas> <numero de hilos> <objetivo> para iniciar el programa.\n");
         return -1;
     }
 
+    rounds = atoi(argv[1]);
+    num_threads = atoi(argv[2]);
+    obj = atoi(argv[3]);
+    
+    create_threads(num_threads, obj);
     
     return 1;
 }
 
-pthread_t** create_threads(int num_threads, int obj) {
-    pthread_t** hilos = NULL;
-    int i, err;
+pthread_t* create_threads(int num_threads, int obj) {
+    pthread_t *hilos = NULL;
+    int i, err, res;
+    long int thread_result;
     
-    //Creo un array para guardar los hilos
-    hilos = (pthread_t**)malloc(num_threads*sizeof(pthread_t*));
-
+    /**Creo un array para guardar los hilos*/
+    hilos = (pthread_t *)malloc(num_threads*sizeof(pthread_t));
+    
     for(i = 0; i < num_threads; i++) {
-        
-        hilos[i] = NULL;
-        hilos[i] = (pthread_t*)malloc(sizeof(pthread_t));
-        
-        if(hilos[i] == NULL) {
-            fprintf(stderr, "Error allocating thread memory\n");
 
-            free_threads_memory(hilos, i);
-        }
-
-        err = pthread_create(hilos[i], NULL, pow_hash, obj);
+        err = pthread_create(&hilos[i], NULL, prueba_de_fuerza, &obj);
         if(err != 0) {
             fprintf(stderr, "pthread_create : %s\n", strerror(err));
-            free_threads_memory(hilos, i);
-            return -1;
-        }
+            free(hilos);
 
+            return NULL;
+        }
     }
 
-    return hilos;
+
+    for(i = 0; i < num_threads; i++) {
+
+        err = pthread_join(hilos[i], (void **)&thread_result);
+        if(err != 0) {
+            fprintf(stderr, "pthread_join : %s\n", strerror(err));
+            free(hilos);
+
+            return NULL;
+        }
+    }
+
+    printf("----------------------------------\nHilos: \n");
+    for(i = 0; i < num_threads; i++) {
+
+        printf("id: %ld\n", hilos[i]);
+    }
+
+    return NULL;
 
 }
 
-void free_threads_memory(pthread_t** hilos, int num_hilos) {
-        int i;
+void *prueba_de_fuerza(void *obj) {
+    int res = 0;
+    int *pObj = obj;
+    
+    while (res != *pObj)
+    {
+        res = (rand() % (10000000 - 1)) + 1;
+        if(res == *pObj) {
+            printf("Hilo %ld encontro la solucion\n", pthread_self());
+            fflush(stdout);
 
-        for(i = 0; i < num_hilos; i++) {
-            free(hilos[i]);
-            hilos[i] = NULL;
+            return (void *)pthread_self();
         }
-
-        free(hilos);
-
-        return; 
+    }
+    
+    return NULL;
 }
