@@ -10,7 +10,7 @@ minero.o: minero.c
 	gcc $(FLAGS) -c minero.c
 
 minero: minero.o pow.o
-	gcc $(FLAGS) -o minero minero.o pow.o
+	gcc $(FLAGS) -pthread -o minero minero.o pow.o
 
 clean:
 	rm -f *.o $(EXE)
