@@ -5,12 +5,12 @@
 #include <unistd.h>
 #include "pow.h"
 
-int round_init(int num_threads,int obj);
+void round_init(int num_threads,int obj);
 void *prueba_de_fuerza(void *obj);
 
+int solucion = -1;
+
 int main(int argc, char** argv) {
-    long int test = 0;
-    pthread_t** hilos = NULL;
     int rounds = 0, num_threads = 0, obj = 0;
     int i = 0;
 
@@ -27,7 +27,11 @@ int main(int argc, char** argv) {
         printf("Ronda %d empieza.\n", i+1);
         printf("Objetivo: %d\n", obj);
 
-        obj = round_init(num_threads, obj);
+        round_init(num_threads, obj);
+
+        obj = solucion;
+        solucion = -1;
+       
         printf("Objetivo de la siguiente ronda: %d\n", obj);
         if(obj == -1) {
             fprintf(stderr, "Error: no se pudo empezar la ronda.\n");
@@ -38,9 +42,9 @@ int main(int argc, char** argv) {
     return 0;
 }
 
-int round_init(int num_threads, int obj) {
+void round_init(int num_threads, int obj) {
     pthread_t *hilos = NULL;
-    int i, err, res;
+    int i, err;
     int thread_result;
     
     /**Creo un array para guardar los hilos*/
@@ -52,31 +56,29 @@ int round_init(int num_threads, int obj) {
         err = pthread_create(&hilos[i], NULL, prueba_de_fuerza, &obj);
         if(err != 0) {
             fprintf(stderr, "pthread_create : %s\n", strerror(err));
+            
             free(hilos);
 
-            return -1;
+            return;
         }
     }
 
     /**Espero que terminen los hilos*/
     for(i = 0; i < num_threads; i++) {
 
-        err = pthread_join(hilos[i], (void **)&thread_result);
+        err = pthread_join(hilos[i], NULL);
         if(err != 0) {
             fprintf(stderr, "pthread_join : %s\n", strerror(err));
+            
             free(hilos);
 
-            return -1;
+            return;
         }
     }
 
-    printf("----------------------------------\nHilos: \n");
-    for(i = 0; i < num_threads; i++) {
+    free(hilos);
 
-        printf("id: %ld\n", hilos[i]);
-    }
-
-    return thread_result;
+    return;
 }
 
 void *prueba_de_fuerza(void *obj) {
@@ -84,14 +86,19 @@ void *prueba_de_fuerza(void *obj) {
     int res = 0, i = 0;
     int *pObj = (int *)obj;
 
-    while(res != *pObj){
-        i = rand() % POW_LIMIT-1;
+    while(solucion == -1){
+        i = rand() % POW_LIMIT - 1;
         res = pow_hash(i);
         if(res == *pObj) {
-            printf("Hilo %ld encontro la solucion para %d: %d\n", pthread_self(), res, i);
-            exit(i);
+            printf("Hilo %ld encontro la solucion %d\n", pthread_self(), res);
+            
+            solucion = res;
+
+            return NULL;
         }
     }
+    
+    printf("Hilo %ld NO encontro solucion, terminado.\n", pthread_self());
     
     return NULL;
 }
