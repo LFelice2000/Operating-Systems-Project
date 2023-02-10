@@ -19,33 +19,41 @@ int main(int argc, char** argv) {
         return -1;
     }
 
+    /**Parse the input values*/
     rounds = atoi(argv[1]);
     num_threads = atoi(argv[2]);
     obj = atoi(argv[3]);
     
+    /**Lanzamos las rondas de minado*/
     for(i = 0; i < rounds; i++){
-        printf("Ronda %d empieza.\n", i+1);
+        printf("Ronda %d empieza.\n------------------------\n", i+1);
         printf("Objetivo: %d\n", obj);
 
         round_init(num_threads, obj);
 
+        /**Se guarda la solucion*/
         obj = solucion;
         solucion = -1;
        
-        printf("Objetivo de la siguiente ronda: %d\n", obj);
-        if(obj == -1) {
-            fprintf(stderr, "Error: no se pudo empezar la ronda.\n");
-            return -1;
-        }
+        printf("Objetivo de la siguiente ronda: %d\n\n", obj);
     }
+
+    printf("\nMinado terminado.\n");
     
     return 0;
 }
 
+/**
+ * Funcion que inicializa la ronda de minado.
+ * 
+ * @param num_threads the number of threads that will be launched per miner.
+ * @param obj objective of the proof of power function.
+ * 
+ * @return 
+*/
 void round_init(int num_threads, int obj) {
     pthread_t *hilos = NULL;
     int i, err;
-    int thread_result;
     
     /**Creo un array para guardar los hilos*/
     hilos = (pthread_t *)malloc(num_threads*sizeof(pthread_t));
@@ -81,24 +89,31 @@ void round_init(int num_threads, int obj) {
     return;
 }
 
+/**
+ * Funcion que realiza el proof of work.
+ * 
+ * @param obj objective of the proof of power function.
+ * 
+ * @return 
+*/
 void *prueba_de_fuerza(void *obj) {
 
     int res = 0, i = 0;
     int *pObj = (int *)obj;
 
     while(solucion == -1){
-        i = rand() % POW_LIMIT - 1;
+        i = (rand() % (1 - POW_LIMIT + 1)) + 1;
         res = pow_hash(i);
         if(res == *pObj) {
             printf("Hilo %ld encontro la solucion %d\n", pthread_self(), res);
             
-            solucion = res;
+            solucion = i;
 
             return NULL;
         }
     }
     
-    printf("Hilo %ld NO encontro solucion, terminado.\n", pthread_self());
+    printf("Hilo %ld NO encontro solucion, terminando...\n", pthread_self());
     
     return NULL;
 }
