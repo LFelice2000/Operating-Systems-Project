@@ -14,3 +14,7 @@
  * b) Reescribir el programa usando sleep y volver a ejecutar top. ¿Ha cambiado algo?
  * 
  */
+
+int main(void){
+    return 0;
+}

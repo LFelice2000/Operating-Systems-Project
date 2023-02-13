@@ -40,7 +40,7 @@ int main(void) {
       perror("fork");
       exit(EXIT_FAILURE);
     } else if (pid == 0) {
-      printf("Child %d\n", i);
+      printf("Child pid: %d and Parent pid:%d\n", getpid(), getppid());
       exit(EXIT_SUCCESS);
     } else if (pid > 0) {
       printf("Parent %d\n", i);
