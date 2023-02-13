@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <math.h>
 #include "pow.h"
 #include "minero.h"
@@ -13,6 +15,7 @@ int target;
 int main(int argc, char** argv) {
     int rounds = 0, num_threads = 0;
     int i = 0;
+    pid_t pid;
 
     if(argc != 4) {
         fprintf(stderr, "Error: debes escribir ./minero <TARGET> <ROUNDS> <THREADS> para iniciar el programa.\n");
@@ -24,23 +27,35 @@ int main(int argc, char** argv) {
     rounds = atoi(argv[2]);
     num_threads = atoi(argv[3]);
     
-    /* Lanzamos las rondas de minado */
-    for(i = 0; i < rounds; i++){
-        printf("Ronda %d empieza.\n------------------------\n", i+1);
-        printf("Objetivo: %d\n", target);
+    pid = fork();
+    if(pid < 0) {
+        printf("No se pudo lanzar el monitor.\n");
+        exit(EXIT_FAILURE);
+    }
+    else if (pid == 0) {
+        execv("./monitor", argv);
+    }
+    else if(pid > 0) {
+        /* Lanzamos las rondas de minado */
+        for(i = 0; i < rounds; i++){
+            printf("Ronda %d empieza.\n------------------------\n", i+1);
+            printf("Objetivo: %d\n", target);
 
-        round_init(num_threads);
+            round_init(num_threads);
 
-        /* Se guarda la solucion */
-        solucion = 0;
-        
-        if(i != rounds-1){
-            /* Se actualiza el objetivo */
-            printf("Objetivo de la siguiente ronda: %d\n\n", target);
+            /* Se guarda la solucion */
+            solucion = 0;
+            
+            if(i != rounds-1){
+                /* Se actualiza el objetivo */
+                printf("Objetivo de la siguiente ronda: %d\n\n", target);
+            }
         }
+
+        printf("\nMinado terminado.\n");
     }
 
-    printf("\nMinado terminado.\n");
+
     
     return EXIT_SUCCESS;
 }
@@ -81,8 +96,6 @@ void round_init(int num_threads) {
         if(end > POW_LIMIT) {
             end = POW_LIMIT;
         }
-
-        printf("Empiezo %d, termino %d\n", thInfo[i].lower, thInfo[i].upper);
 
         err = pthread_create(&hilos[i], NULL, prueba_de_fuerza, (void *)&thInfo[i]);
         if(err != 0) {
