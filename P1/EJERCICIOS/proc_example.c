@@ -46,6 +46,6 @@ int main(void) {
       printf("Parent %d\n", i);
     }
   }
-  wait(NULL);
+  
   exit(EXIT_SUCCESS);
 }

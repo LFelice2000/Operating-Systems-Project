@@ -13,7 +13,7 @@ int solucion = 0;
 int target;
 
 int main(int argc, char** argv) {
-    int rounds = 0, num_threads = 0;
+    int rounds = 0, num_threads = 0, monitor_stat = 0;
     int i = 0;
     pid_t pid;
 
@@ -30,12 +30,18 @@ int main(int argc, char** argv) {
     pid = fork();
     if(pid < 0) {
         printf("No se pudo lanzar el monitor.\n");
-        exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
     else if (pid == 0) {
-        execv("./monitor", argv);
+        monitor_stat = execv("./monitor", argv);
+        if(monitor_stat < 0) {
+            printf("Monitor exited unexpectedly\n");
+            
+            return EXIT_FAILURE;
+        }
     }
     else if(pid > 0) {
+        
         /* Lanzamos las rondas de minado */
         for(i = 0; i < rounds; i++){
             printf("Ronda %d empieza.\n------------------------\n", i+1);
@@ -52,11 +58,10 @@ int main(int argc, char** argv) {
             }
         }
 
-        printf("\nMinado terminado.\n");
     }
 
-
     
+    wait(NULL);
     return EXIT_SUCCESS;
 }
 
