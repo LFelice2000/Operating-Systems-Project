@@ -13,13 +13,13 @@ int solucion = 0;
 int target;
 
 int main(int argc, char** argv) {
-    int rounds = 0, num_threads = 0, monitor_stat = 0;
+    int rounds = 0, num_threads = 0, monitor_stat, ret;
     int i = 0;
     pid_t pid;
 
     if(argc != 4) {
         fprintf(stderr, "Error: debes escribir ./minero <TARGET> <ROUNDS> <THREADS> para iniciar el programa.\n");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
 
     /* Parse the input values */
@@ -30,14 +30,14 @@ int main(int argc, char** argv) {
     pid = fork();
     if(pid < 0) {
         printf("No se pudo lanzar el monitor.\n");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
     else if (pid == 0) {
-        monitor_stat = execv("./monitor", argv);
-        if(monitor_stat < 0) {
+        ret = execv("./monitor", argv);
+        if(ret < 0) {
             printf("Monitor exited unexpectedly\n");
             
-            return EXIT_FAILURE;
+            exit(EXIT_FAILURE);
         }
     }
     else if(pid > 0) {
@@ -61,8 +61,15 @@ int main(int argc, char** argv) {
     }
 
     
-    wait(NULL);
-    return EXIT_SUCCESS;
+    monitor_stat = wait(NULL);
+    if(monitor_stat < 0) {
+        printf("Monitor exited unexpectedly\n");
+        exit(EXIT_FAILURE);
+    }
+    else {
+        printf("Monitor exited with status %d\n", monitor_stat);
+    }
+    exit(EXIT_SUCCESS);
 }
 
 /**

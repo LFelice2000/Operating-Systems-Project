@@ -9,11 +9,11 @@
 
 int main(int argc, char** argv) {
     pid_t pid;
-    int ret;
+    int ret, miner_stat;
 
     if(argc != 4) {
         fprintf(stderr, "Error: debes escribir ./minero <TARGET> <ROUNDS> <THREADS> para iniciar el programa.\n");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
 
     /* Parse the input values */
@@ -29,13 +29,19 @@ int main(int argc, char** argv) {
     if(pid == 0) {
         ret = execvp("./minero", argv);
         if(ret == EXIT_FAILURE) {
-            printf("Mier exited unexpectedly\n");
+            printf("Error in miner execution\n");
             exit(EXIT_FAILURE);
         }
-
-        printf("Miner exited with status %d\n", ret);
     }
     
-    wait(NULL);
+    miner_stat = wait(NULL);
+    if(miner_stat < 0) {
+       printf("Miner exited unexpectedly\n");
+       
+       exit(EXIT_FAILURE);
+    } else {
+        printf("Miner exited with status %d\n", miner_stat);
+    }
+
     exit(EXIT_SUCCESS);
 }
