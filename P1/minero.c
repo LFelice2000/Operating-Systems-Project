@@ -27,20 +27,18 @@ int main(int argc, char** argv) {
     rounds = atoi(argv[2]);
     num_threads = atoi(argv[3]);
     
+    /* Se crea el proceso monitor */
     pid = fork();
     if(pid < 0) {
         printf("No se pudo lanzar el monitor.\n");
         exit(EXIT_FAILURE);
-    }
-    else if (pid == 0) {
+    } else if (pid == 0) {
         ret = execv("./monitor", argv);
         if(ret < 0) {
             printf("Monitor exited unexpectedly\n");
-            
             exit(EXIT_FAILURE);
         }
-    }
-    else if(pid > 0) {
+    } else if(pid > 0) {
         
         /* Lanzamos las rondas de minado */
         for(i = 0; i < rounds; i++){
@@ -59,8 +57,8 @@ int main(int argc, char** argv) {
         }
 
     }
-
     
+    /* Se espera a que termine el monitor */
     monitor_stat = wait(NULL);
     if(monitor_stat < 0) {
         printf("Monitor exited unexpectedly\n");

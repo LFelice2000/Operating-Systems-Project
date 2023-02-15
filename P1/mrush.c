@@ -18,7 +18,7 @@ int main(int argc, char** argv) {
 
     /* Parse the input values */
     
-    printf("EL proceso principal lanza minero...\n");
+    printf("El proceso principal lanza minero...\n");
     
     /* Lanzamos al minero*/
     pid = fork();
@@ -26,6 +26,7 @@ int main(int argc, char** argv) {
         printf("Error creating minero fork\n");
         exit(EXIT_FAILURE);
     }
+
     if(pid == 0) {
         ret = execvp("./minero", argv);
         if(ret == EXIT_FAILURE) {
@@ -37,7 +38,6 @@ int main(int argc, char** argv) {
     miner_stat = wait(NULL);
     if(miner_stat < 0) {
        printf("Miner exited unexpectedly\n");
-       
        exit(EXIT_FAILURE);
     } else {
         printf("Miner exited with status %d\n", miner_stat);

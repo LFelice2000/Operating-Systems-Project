@@ -8,6 +8,6 @@
 int main(int argc, char** argv) {
 
     fprintf(stdout, "Monitor Creado =)\nCerrandolo...\n");
-
     return EXIT_SUCCESS;
+    
 }
