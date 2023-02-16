@@ -1,28 +1,26 @@
-EXE = minero mrush monitor
+EXE = mrush
 FLAGS = -Wall -pedantic
+LIBS = -lpthread -lm
 
 all: $(EXE)
 
 pow.o: pow.c
 	gcc $(FLAGS) -c pow.c
 
-minero.o: minero.c
-	gcc $(FLAGS) -c minero.c 
-
-minero: minero.o pow.o
-	gcc $(FLAGS) -pthread -o minero minero.o pow.o -lm
-
-mrush.o: mrush.c
-	gcc $(FLAGS) -c mrush.c
-
-mrush: mrush.o
-	gcc $(FLAGS) -o mrush mrush.o
-
 monitor.o: monitor.c 
 	gcc $(FLAGS) -c monitor.c
 
 monitor: monitor.o
-	gcc $(FLAGS) -o monitor monitor.o
+	gcc $(FLAGS) -o monitor.o
+
+minero.o: minero.c
+	gcc $(FLAGS) -c minero.c
+
+mrush.o: mrush.c
+	gcc $(FLAGS) -c mrush.c
+
+mrush: mrush.o minero.o pow.o monitor.o
+	gcc $(FLAGS) -o mrush mrush.o minero.o pow.o monitor.o $(LIBS)
 
 clean:
 	rm -f *.o $(EXE)

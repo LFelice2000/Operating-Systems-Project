@@ -5,11 +5,11 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-
+#include "minero.h"
 
 int main(int argc, char** argv) {
     pid_t pid;
-    int ret, miner_stat;
+    int miner_stat;
 
     if(argc != 4) {
         fprintf(stderr, "Error: debes escribir ./minero <TARGET> <ROUNDS> <THREADS> para iniciar el programa.\n");
@@ -28,20 +28,16 @@ int main(int argc, char** argv) {
     }
 
     if(pid == 0) {
-        ret = execvp("./minero", argv);
-        if(ret == EXIT_FAILURE) {
-            printf("Error in miner execution\n");
-            exit(EXIT_FAILURE);
-        }
+        miner_stat = minero(atoi(argv[1]), atoi(argv[2]), atoi(argv[3]));
     }
     
-    miner_stat = wait(NULL);
-    if(miner_stat < 0) {
-       printf("Miner exited unexpectedly\n");
-       exit(EXIT_FAILURE);
-    } else {
-        printf("Miner exited with status %d\n", miner_stat);
-    }
+    wait(NULL);
 
+    if(miner_stat == EXIT_FAILURE) {
+        printf("Error in miner execution\n");
+        exit(EXIT_FAILURE);
+    }
+    printf("Miner exited with status %d\n", miner_stat);
+    
     exit(EXIT_SUCCESS);
 }

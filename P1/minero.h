@@ -7,6 +7,16 @@ typedef struct info_hilo{
 } info_hilo;
 
 /**
+ * @brief Funcion que realiza el minado de la cadena.
+ * 
+ * @param target 
+ * @param round 
+ * @param num_threads 
+ * @return int 
+ */
+int minero(int target, int round, int num_threads);
+
+/**
  * Funcion que inicializa la ronda de minado.
  * 
  * @param num_threads the number of threads that will be launched per miner.

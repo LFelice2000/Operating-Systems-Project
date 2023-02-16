@@ -8,24 +8,22 @@
 #include <math.h>
 #include "pow.h"
 #include "minero.h"
+#include "monitor.h"
 
 int solucion = 0;
 int target;
 
-int main(int argc, char** argv) {
-    int rounds = 0, num_threads = 0, monitor_stat, ret;
+int minero(int obj, int rounds, int num_threads) {
+    int monitor_stat;
     int i = 0;
     pid_t pid;
 
-    if(argc != 4) {
+    if(obj < 0 || rounds < 0 || num_threads < 0) {
         fprintf(stderr, "Error: debes escribir ./minero <TARGET> <ROUNDS> <THREADS> para iniciar el programa.\n");
         exit(EXIT_FAILURE);
     }
 
-    /* Parse the input values */
-    target = atoi(argv[1]);
-    rounds = atoi(argv[2]);
-    num_threads = atoi(argv[3]);
+    target = obj;
     
     /* Se crea el proceso monitor */
     pid = fork();
@@ -33,11 +31,7 @@ int main(int argc, char** argv) {
         printf("No se pudo lanzar el monitor.\n");
         exit(EXIT_FAILURE);
     } else if (pid == 0) {
-        ret = execv("./monitor", argv);
-        if(ret < 0) {
-            printf("Monitor exited unexpectedly\n");
-            exit(EXIT_FAILURE);
-        }
+        monitor_stat = monitor();
     } else if(pid > 0) {
         
         /* Lanzamos las rondas de minado */
@@ -59,14 +53,14 @@ int main(int argc, char** argv) {
     }
     
     /* Se espera a que termine el monitor */
-    monitor_stat = wait(NULL);
+    wait(NULL);
+    
     if(monitor_stat < 0) {
         printf("Monitor exited unexpectedly\n");
         exit(EXIT_FAILURE);
     }
-    else {
-        printf("Monitor exited with status %d\n", monitor_stat);
-    }
+    printf("Monitor exited with status %d\n", monitor_stat);
+
     exit(EXIT_SUCCESS);
 }
 
