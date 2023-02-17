@@ -9,15 +9,15 @@ typedef struct info_hilo{
 /**
  * @brief Funcion que realiza el minado de la cadena.
  * 
- * @param target 
- * @param round 
- * @param num_threads 
- * @return int 
+ * @param target target of the proof of power function.
+ * @param round number of rounds to mine.
+ * @param num_threads number of threads that will be launched per miner.
+ * @return int EXIT_SUCCESS if the miner has mined the chain, EXIT_FAILURE otherwise.
  */
 int minero(int target, int round, int num_threads);
 
 /**
- * Funcion que inicializa la ronda de minado.
+ * Function that initializes the mining round.
  * 
  * @param num_threads the number of threads that will be launched per miner.
  * @param obj objective of the proof of power function.
@@ -27,7 +27,7 @@ int minero(int target, int round, int num_threads);
 void round_init(int num_threads);
 
 /**
- * Funcion que realiza el proof of work.
+ * Function that performs the proof of power function.
  * 
  * @param obj objective of the proof of power function.
  * 
