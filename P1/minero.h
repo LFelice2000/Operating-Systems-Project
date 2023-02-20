@@ -1,9 +1,19 @@
 #ifndef _MINERO_H
 #define _MINERO_H
 
-typedef struct info_hilo{
+typedef struct info_minero
+{
+    int prevtarget;
+    int target;
+    int end;
+
+} info_minero;
+
+typedef struct info_hilo
+{
     int upper;
     int lower;
+
 } info_hilo;
 
 /**

@@ -27,7 +27,7 @@ int main(void) {
     perror("fork");
     exit(EXIT_FAILURE);
   } else if (pid == 0) {
-    if (execvp("ls", argv)) {
+    if (execl("ls", argv[1], argv[2])) {
       perror("execvp");
       exit(EXIT_FAILURE);
     }
