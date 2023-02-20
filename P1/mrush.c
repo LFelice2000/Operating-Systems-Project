@@ -19,9 +19,7 @@ int main(int argc, char** argv) {
         fprintf(stderr, "Error: debes escribir ./minero <TARGET> <ROUNDS> <THREADS> para iniciar el programa.\n");
         exit(EXIT_FAILURE);
     }
-    
-    printf("El proceso principal lanza minero...\n");
-    
+
     /* Lanzamos al minero*/
     pid = fork();
     if(pid < 0) {

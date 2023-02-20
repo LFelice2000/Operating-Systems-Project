@@ -16,12 +16,10 @@ int monitor_stat = 1;
 
 int minero(int obj, int rounds, int num_threads) {
 
-    char buf[10000];
     int i = 0, status;
     pid_t pid;
-    int fd[2], pipe_stat;
+    int request_validation[2], response_validation[2], pipe_stat, val_status = 0;
     ssize_t nbytes;
-
     info_minero *info = NULL;
 
     /* Se comprueba que los argumentos sean correctos */
@@ -32,15 +30,13 @@ int minero(int obj, int rounds, int num_threads) {
 
     target = obj;
 
-    info = (info_minero*)malloc(sizeof(info_minero));
-    if(info == NULL){
-        fprintf(stderr, "info_minero error\n");
+    pipe_stat = pipe(request_validation);
+    if(pipe_stat == -1){
+        fprintf(stderr, "Pipe error\n");
         return EXIT_FAILURE;
     }
 
-    info->end = 0;
-
-    pipe_stat = pipe(fd);
+    pipe_stat = pipe(response_validation);
     if(pipe_stat == -1){
         fprintf(stderr, "Pipe error\n");
         return EXIT_FAILURE;
@@ -52,14 +48,20 @@ int minero(int obj, int rounds, int num_threads) {
         printf("No se pudo lanzar el monitor.\n");
         return EXIT_FAILURE;
     } else if(pid == 0) {
-        monitor_stat = monitor(fd);
+        monitor_stat = monitor(request_validation, response_validation);
         exit(monitor_stat);
     }
+
+    info = (info_minero*)calloc(1, sizeof(info_minero));
+    if(info == NULL){
+        fprintf(stderr, "info_minero error\n");
+        return EXIT_FAILURE;
+    }
+
+    info->end = 0;
         
     /* Lanzamos las rondas de minado */
     for(i = 0; i < rounds; i++){
-        printf("Ronda %d empieza.\n------------------------\n", i+1);
-        printf("Objetivo: %d\n", target);
 
         info->prevtarget = target;
 
@@ -70,22 +72,38 @@ int minero(int obj, int rounds, int num_threads) {
 
         info->target = target;
 
-        close(fd[0]);
-        nbytes = write(fd[1], info, sizeof(info));
+        close(request_validation[0]);
+        nbytes = write(request_validation[1], info, sizeof(info_minero));
         if(nbytes == -1){
             fprintf(stderr, "Write error\n");
             return EXIT_FAILURE;
         }
+
+        close(response_validation[1]);
+        nbytes = read(response_validation[0], info, sizeof(info_minero));
+        if(nbytes == -1){
+            fprintf(stderr, "Write error\n");
+            return EXIT_FAILURE;
+        }
+
+        if(info->validation == -1) {
+            val_status = -1;
+            break;
+        }
         
     }
-
+    
     info->end = 1;
 
-    close(fd[0]);
-    nbytes = write(fd[1], info, sizeof(info));
+    close(request_validation[0]);
+    nbytes = write(request_validation[1], info, sizeof(info_minero));
     if(nbytes == -1){
         fprintf(stderr, "Write error\n");
         return EXIT_FAILURE;
+    }
+    
+    if(val_status == -1) {
+        printf("The solution has been invalidated\n");
     }
 
     /* Se espera a que termine el monitor */
@@ -94,12 +112,19 @@ int minero(int obj, int rounds, int num_threads) {
     /* Se comprueba el estado de salida del monitor */
     if(WIFEXITED(status)) {
         monitor_stat = WEXITSTATUS(status);
-    }else{
+        printf("Monitor exited with status %d\n", monitor_stat);
+    } else {
         printf("Monitor exited unexpectedly\n");
+    }
+
+    close(request_validation[0]);
+    close(response_validation[1]);
+    free(info);
+
+    if(val_status == -1 || status == 1) {
         return EXIT_FAILURE;
     }
 
-    printf("Monitor exited with status %d\n", monitor_stat);
     return EXIT_SUCCESS;
 }
 
@@ -153,6 +178,7 @@ void round_init(int num_threads) {
     }
 
     free(hilos);
+    free(thInfo);
 
     return;
 }
@@ -181,14 +207,11 @@ void *prueba_de_fuerza(void *info) {
             solucion = 1;
             target = i;
 
-            printf("Hilo %ld encontró solución: %d\n", pthread_self(), target);
             return NULL;
         }
 
         i++;
     }
-    
-    printf("Hilo %ld NO encontró solución, terminando...\n", pthread_self());
     
     return NULL;
 }

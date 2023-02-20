@@ -6,6 +6,7 @@ typedef struct info_minero
     int prevtarget;
     int target;
     int end;
+    int validation;
 
 } info_minero;
 
