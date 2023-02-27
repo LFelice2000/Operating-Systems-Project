@@ -1,3 +1,14 @@
+/**
+ * @file minero.h
+ * @author Luis Felice and Angela Valderrama.
+ * @brief 
+ * @version 0.1
+ * @date 2023-02-27
+ * 
+ * @copyright Copyright (c) 2023
+ * 
+ */
+
 #ifndef _MINERO_H
 #define _MINERO_H
 

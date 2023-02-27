@@ -1,3 +1,14 @@
+/**
+ * @file mrush.c
+ * @author Luis Felice and Angela Valderrama.
+ * @brief 
+ * @version 0.1
+ * @date 2023-02-27
+ * 
+ * @copyright Copyright (c) 2023
+ * 
+ */
+
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,6 +51,7 @@ int main(int argc, char** argv) {
         printf("Miner exited unexpectedly\n");
         exit(EXIT_FAILURE);
     }
+    
     printf("Miner exited with status %d\n", miner_stat);
     exit(EXIT_SUCCESS);
     
