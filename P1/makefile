@@ -1,5 +1,5 @@
 EXE = mrush
-FLAGS = -Wall -pedantic
+FLAGS = -g -Wall -ansi -pedantic
 LIBS = -lpthread -lm
 
 all: $(EXE)

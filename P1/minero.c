@@ -9,11 +9,11 @@
  * 
  */
 
-#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <pthread.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <math.h>
@@ -24,7 +24,6 @@
 int solucion = 0;
 int target;
 int monitor_stat = 1;
-
 
 int minero(int obj, int rounds, int num_threads) {
 
@@ -73,6 +72,7 @@ int minero(int obj, int rounds, int num_threads) {
         return EXIT_FAILURE;
     }
 
+    /* Se inicia el minado */
     info->end = 0;
         
     /* Lanzamos las rondas de minado */
@@ -174,7 +174,7 @@ void round_init(int num_threads) {
     /* Se crea un array para guardar la información de los hilos */
     thInfo = (info_hilo*)malloc(num_threads*sizeof(info_hilo));
     if(thInfo == NULL) {
-        /**cosas*/
+        fprintf(stderr, "Error: no se ha podido reservar memoria para la información de los hilos.\n");
         return;
     }
 
@@ -185,7 +185,7 @@ void round_init(int num_threads) {
     /* Se crean y se lanzan los hilos que ejecutarán la prueba de fuerza */
     for(i = 0; i < num_threads; i++) {
         
-        /* Se guarda la información de cada hilo */
+        /* Se calcula el rango de búsqueda de cada hilo */
         thInfo[i].lower = init * i;
         thInfo[i].upper = end - 1;
 
@@ -228,22 +228,23 @@ void *prueba_de_fuerza(void *info) {
     int res = 0, i = 0;
     info_hilo *thInfo = (info_hilo*)info;
 
-    /* Se comprueba si ya se ha encontrado la solucion */
+    /* Se prueba la fuerza bruta */
     i = thInfo->lower;
     while(solucion == 0){
 
+        /* Se comprueba que el número no se salga del rango */
         if(i > thInfo->upper) {
             break;
         }
 
-        /* Se calcula el hash del numero aleatorio */
+        /* Se calcula el hash */
         res = pow_hash(i);
 
         /* Se comprueba si el hash es igual al objetivo */
         if(res == target) {
             
-            /* Se guarda la solucion en una variable global para que
-               los demás hilos sepan que tienen que parar de minar */
+            /* Se guarda la solucion en la variable global target y 
+                se cambia la flag para que los demás hilos dejen de minar */
             solucion = 1;
             target = i;
 
