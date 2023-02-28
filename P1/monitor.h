@@ -12,7 +12,6 @@
 #ifndef MONITOR_H
 #define MONITOR_H
 
-
 /**
  * @brief valida la solución del minero usando tuberías
  * 
@@ -21,4 +20,5 @@
  * @return int 
  */
 int monitor(int *request_validation, int *response_validation);
-#endif
+
+#endif /* MONITOR_H */

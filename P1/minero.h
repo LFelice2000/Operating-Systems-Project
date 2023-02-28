@@ -12,8 +12,8 @@
 #ifndef _MINERO_H
 #define _MINERO_H
 
-typedef struct info_minero
-{
+typedef struct info_minero {
+
     int prevtarget;
     int target;
     int end;
@@ -21,10 +21,10 @@ typedef struct info_minero
 
 } info_minero;
 
-typedef struct info_hilo
-{
-    int upper;
+typedef struct info_hilo {
+
     int lower;
+    int upper;
 
 } info_hilo;
 
@@ -57,4 +57,4 @@ void round_init(int num_threads);
 */
 void *prueba_de_fuerza(void *obj);
 
-#endif
+#endif /* _MINERO_H */

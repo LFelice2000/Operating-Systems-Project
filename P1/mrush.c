@@ -26,7 +26,7 @@ int main(int argc, char** argv) {
 
     /* Comprobamos que los argumentos sean correctos */
     if(argc != 4) {
-        fprintf(stderr, "Error: debes escribir ./minero <TARGET> <ROUNDS> <THREADS> para iniciar el programa.\n");
+        fprintf(stderr, "Error: debes escribir ./minero <TARGET_INIT> <ROUNDS> <N_THREADS> para iniciar el programa.\n");
         exit(EXIT_FAILURE);
     }
 
