@@ -97,6 +97,7 @@ int minero(int obj, int rounds, int num_threads) {
         nbytes = write(request_validation[1], info, sizeof(info_minero));
         if(nbytes == -1){
             fprintf(stderr, "Write error\n");
+            free(info);
             return EXIT_FAILURE;
         }
 
@@ -128,6 +129,7 @@ int minero(int obj, int rounds, int num_threads) {
     nbytes = write(request_validation[1], info, sizeof(info_minero));
     if(nbytes == -1){
         fprintf(stderr, "Write error\n");
+        free(info);
         return EXIT_FAILURE;
     }
     
@@ -170,11 +172,16 @@ void round_init(int num_threads) {
     
     /* Se crea un array para guardar los hilos */
     hilos = (pthread_t *)malloc(num_threads*sizeof(pthread_t));
+    if(hilos == NULL) {
+        fprintf(stderr, "Error: no se ha podido reservar memoria para los hilos.\n");
+        return;
+    }
 
     /* Se crea un array para guardar la información de los hilos */
     thInfo = (info_hilo*)malloc(num_threads*sizeof(info_hilo));
     if(thInfo == NULL) {
         fprintf(stderr, "Error: no se ha podido reservar memoria para la información de los hilos.\n");
+        free(hilos);
         return;
     }
 
