@@ -15,16 +15,29 @@
  * a) Stop 1. Inspeccionar los descriptores de fichero del proceso. ¿Qu ́e descriptores de
  * fichero se encuentran abiertos? ¿A qu ́e tipo de fichero apuntan?
  * 
+ * Hay 14 descriptores de fichero abiertos, todos ellos apuntan a ficheros regulares.
+ * 
  * b) Stop 2 y Stop 3. ¿Que cambios se han producido en la tabla de descriptores de
  * fichero?
+ * 
+ * Se han creado dos ficheros regulares, FILE1 y FILE2, y se han abierto dos descriptores
+ * de fichero, uno para cada fichero (3 y 4)
  * 
  * c) Stop 4. ¿Se ha borrado de disco el fichero FILE1? ¿Por qu ́e? ¿Se sigue pudiendo ac-
  * ceder al fichero a trav ́es del directorio /proc? ¿Hay, por tanto, alguna forma sencilla
  * de recuperar los datos?
  * 
+ * No se ha borrado de disco el fichero FILE1, porque no se ha cerrado el descriptor. Sólo
+ * se ha hecho unlink, que elimina el enlace al fichero, pero no el fichero en sí. Sí se 
+ * puede acceder al fichero y se puede leer, pero no se puede escribir.
+ * 
+ * 
  * d) Stop 5, Stop 6 y Stop 7. ¿Qu ́e cambios se han producido en la tabla de descriptores
  * de fichero? ¿Qu ́e se puede deducir sobre la numeraci ́on de un descriptor de fichero
  * obtenido tras una llamada a open?
+ * 
+ * Se han creado dos ficheros regulares, FILE3 y FILE4, y se han abierto dos descriptores.
+ * Se había cerrado el 3, pero se ha vuelto a abrir con otro fichero, por lo que el 3 se ha vuelto a usar.
  * 
  */
 #include <fcntl.h>

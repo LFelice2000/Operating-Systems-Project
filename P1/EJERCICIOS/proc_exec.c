@@ -9,8 +9,15 @@
  * 
  * a) ¿Que sucede si se sustituye el primer elemento del array argv por la cadena "mi-ls"? ¿Por que?
  * 
+ *   No hay ningún error, ya que el primer elemento del array argv es el nombre del programa.
+ *   Por lo tanto, si se sustituye el primer elemento del array argv por la cadena "mi-ls",
+ *   el programa se ejecuta correctamente. El problema vnedría si se cambia el primer argumento de execvp.
+ * 
  * b) ¿Que modificaciones habr ́ıa que hacer en el programa anterior para utilizar la funcion
  * execl en lugar de execvp?
+ * 
+ *  Habría que cambiar el primer argumento de execvp por el path del programa, y pasar los argumentos
+ *  de uno en uno en lugar de pasar un array de argumentos. El ultimo argumento deber ser NULL.
  * 
  */
 #include <stdio.h>
@@ -27,8 +34,8 @@ int main(void) {
     perror("fork");
     exit(EXIT_FAILURE);
   } else if (pid == 0) {
-    if (execl("ls", argv[1], argv[2])) {
-      perror("execvp");
+    if (execl("/usr/bin/ls", argv[0], argv[1], NULL)) {
+      perror("execl");
       exit(EXIT_FAILURE);
     }
   } else {

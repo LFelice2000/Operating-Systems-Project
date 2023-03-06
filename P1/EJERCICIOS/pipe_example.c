@@ -9,7 +9,14 @@
  * 
  * a) Ejecutar el codigo. ¿Qu ́e se imprime por pantalla?
  * 
+ *  I have received the string: Hi all!
+    I have written in the pipe
+ * 
  * b) ¿Que ocurre si el proceso padre no cierra el extremo de escritura? ¿Por que?
+ * 
+ * El proceso padre se queda bloqueado en la llamada a read() porque está esperando a que
+ * haya algo que leer. No puede reconocer que la escritura ha terminado porque no ha cerrado
+ * el extremo de escritura.
  * 
  */
 #include <stdio.h>
