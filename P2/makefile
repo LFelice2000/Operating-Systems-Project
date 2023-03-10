@@ -1,6 +1,6 @@
 EXE = voting
 FLAGS = -g -Wall -ansi -pedantic
-LIBS = -lpthread -lm
+LIBS = -lpthread -lm -lbsd
 
 all: $(EXE)
 
