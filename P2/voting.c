@@ -16,6 +16,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <string.h>
+#include <semaphore.h>
 
 int got_signal = 0;
 
@@ -30,6 +31,7 @@ int main(int argc, char *argv[]) {
     pid_t pid;
     char bufpid[30] = "\0";
     int nprocs = 0, i, *pids = NULL;
+    sem_t *candsem = NULL;
 
     struct sigaction act;
 
@@ -51,6 +53,8 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
+    
+
     /* Se crean los procesos votantes */
     i = 0;
     while ((pid = fork()) != 0 && i < nprocs)
@@ -64,30 +68,30 @@ int main(int argc, char *argv[]) {
                 exit(EXIT_FAILURE);
             }
 
-            sprintf(bufpid, "Proceso %d: %d\n", (i+1), pid);
+            sprintf(bufpid, "%d\n", pid);
             fwrite(bufpid, strlen(bufpid), 1, fpid);
             fflush(fpid);
             fclose(fpid);
 
         }else if(pid == 0) {
-            printf("Proceso hijo esperando...\n");
+            votante(nprocs-1);
         }
 
         i++;
     }
 
     /* El proceso Principal envía la señal SIGUSR1 a todos los procesos votantes */
-    for (i = 0; i < nprocs; i++){
+    /*for (i = 0; i < nprocs; i++){
         kill(pids[i], SIGUSR1);
     }
 
     /* Si el proceso Principal ha recibido SIGINT, envía SIGTERM a todos los procesos votantes */
-    if(got_signal){
+    /*if(got_signal){
         for (i = 0; i < nprocs; i++){
             kill(pids[i], SIGTERM);
         }
         printf("Finishing by signal\n");
-    }
+    }*/
 
     /* Se recogen a los procesos votantes */
     while (wait(NULL) != -1);

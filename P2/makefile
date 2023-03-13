@@ -1,6 +1,6 @@
 EXE = voting
-FLAGS = -g -Wall -ansi -pedantic
-LIBS = -lpthread -lm -lbsd
+FLAGS = -g -pedantic
+LIBS = -lpthread
 
 all: $(EXE)
 
@@ -14,13 +14,13 @@ monitor: monitor.o
 	gcc $(FLAGS) -o monitor.o
 
 minero.o: minero.c
-	gcc $(FLAGS) -c minero.c
+	gcc $(0FLAGS) -c minero.c
 
 voting.o: voting.c
 	gcc $(FLAGS) -c voting.c
 
-voting: voting.o minero.o pow.o monitor.o
-	gcc $(FLAGS) -o voting voting.o minero.o pow.o monitor.o $(LIBS)
+voting: voting.o
+	gcc $(FLAGS) -o voting voting.o $(LIBS)
 
 clean:
 	rm -f *.o $(EXE) pids.txt
