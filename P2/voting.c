@@ -17,6 +17,7 @@
 #include <sys/wait.h>
 #include <string.h>
 #include <semaphore.h>
+#include "votante.h"
 
 int got_signal = 0;
 
@@ -31,7 +32,7 @@ int main(int argc, char *argv[]) {
     pid_t pid;
     char bufpid[30] = "\0";
     int nprocs = 0, i, *pids = NULL;
-    sem_t *candsem = NULL;
+    sem_t sem;
 
     struct sigaction act;
 
@@ -53,7 +54,11 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    
+    /* Se crea el semáforo */
+    if(sem_init(&sem, 1, 1) == -1) {
+        perror("sem_init");
+        exit(EXIT_FAILURE);
+    }
 
     /* Se crean los procesos votantes */
     i = 0;
@@ -73,28 +78,42 @@ int main(int argc, char *argv[]) {
             fflush(fpid);
             fclose(fpid);
 
-        }else if(pid == 0) {
-            votante(nprocs-1);
         }
 
         i++;
     }
 
-    /* El proceso Principal envía la señal SIGUSR1 a todos los procesos votantes */
-    /*for (i = 0; i < nprocs; i++){
-        kill(pids[i], SIGUSR1);
-    }
+    if(pid){
 
-    /* Si el proceso Principal ha recibido SIGINT, envía SIGTERM a todos los procesos votantes */
-    /*if(got_signal){
+        /* El proceso Principal envía la señal SIGUSR1 a todos los procesos votantes */
         for (i = 0; i < nprocs; i++){
-            kill(pids[i], SIGTERM);
+            printf("Enviando señal SIGUSR1 al proceso %d\n", pids[i]);
+            kill(pids[i], SIGUSR1);
         }
-        printf("Finishing by signal\n");
-    }*/
 
-    /* Se recogen a los procesos votantes */
-    while (wait(NULL) != -1);
+        /* Si el proceso Principal ha recibido SIGINT, envía SIGTERM a todos los procesos votantes */
+        if(got_signal){
+            for (i = 0; i < nprocs; i++){
+                kill(pids[i], SIGTERM);
+            }
+            printf("Finishing by signal\n");
+        }
+
+        /* Se recogen a los procesos votantes */
+        while (wait(NULL) != -1);
+
+        /* Se destruye el semáforo */
+        if(sem_destroy(&sem) == -1) {
+            perror("sem_destroy");
+            exit(EXIT_FAILURE);
+        }
+
+        /* Se libera la memoria */
+        free(pids);
+    } else if(pid == 0) {
+        /* Se ejecuta el proceso votante */
+        votante(nprocs, &sem);
+    }
     
     exit(EXIT_SUCCESS);
 }

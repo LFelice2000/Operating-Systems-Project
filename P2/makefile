@@ -16,11 +16,14 @@ monitor: monitor.o
 minero.o: minero.c
 	gcc $(0FLAGS) -c minero.c
 
+votante.o: votante.c
+	gcc $(FLAGS) -c votante.c
+
 voting.o: voting.c
 	gcc $(FLAGS) -c voting.c
 
-voting: voting.o
-	gcc $(FLAGS) -o voting voting.o $(LIBS)
+voting: voting.o votante.o
+	gcc $(FLAGS) -o voting voting.o votante.o $(LIBS)
 
 clean:
-	rm -f *.o $(EXE) pids.txt
+	rm -f *.o $(EXE) *.txt

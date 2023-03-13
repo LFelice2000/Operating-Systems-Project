@@ -6,24 +6,30 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <semaphore.h>
+#include <errno.h>
 
 int got_SIGUSR1 = 0;
 int got_SIGUSR2 = 0;
+int got_SIGTERM = 0;
 
-void usr1handler(int sig) {
-    got_SIGUSR1 = 1;
+void sighandler(int sig) {
+    if(sig == SIGUSR1){
+        got_SIGUSR1 = 1;
+    }else if(sig == SIGUSR2){
+        got_SIGUSR2 = 1;
+    }else if(sig == SIGTERM){
+        got_SIGTERM = 1;
+    }
 }
 
-void usr2handler(int sig) {
-    got_SIGUSR2 = 1;
-}
-
-int votante(int nprocs, int candsem) {
+int votante(int nprocs, sem_t *candsem) {
 
     FILE *fp = NULL;
     struct sigaction act;
     pid_t *pids = NULL, pid;
-    int voto = 0, i = 0;
+    char bufpid[30] = "\0";
+    int voto = 0, i = 0, yes = 0, no = 0;
+    sigset_t oldset;
 
     pids = (pid_t *) malloc((nprocs) * sizeof(pid_t));
     if(pids == NULL) {
@@ -32,29 +38,41 @@ int votante(int nprocs, int candsem) {
     }
 
     /* Se configura la captura de señales */
-    act.sa_handler = usr1handler;
+    act.sa_handler = sighandler;
     sigemptyset(&act.sa_mask);
+    sigaddset(&act.sa_mask, SIGUSR1);
+    sigaddset(&act.sa_mask, SIGUSR2);
+    sigaddset(&act.sa_mask, SIGTERM);
     act.sa_flags = 0;
+    
+    /* bloquear señales */
+    sigprocmask(SIG_BLOCK, &act.sa_mask, &oldset);
 
     if(sigaction(SIGUSR1, &act, NULL) < 0) {
         perror("sigaction");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
-
-    act.sa_handler = usr2handler;
-    sigemptyset(&act.sa_mask);
-    act.sa_flags = 0;
 
     if(sigaction(SIGUSR2, &act, NULL) < 0) {
         perror("sigaction");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
-    /* Cuando el sistema esté listo */
+    if(sigaction(SIGTERM, &act, NULL) < 0) {
+        perror("sigaction");
+        exit(EXIT_FAILURE);
+    }
+
+    /* esperar a que el sistema esté listo y se reciba SIGUSR1 */
+    sigsuspend(&oldset);
+
+    /* cuando el sistema esté listo */
     while(got_SIGUSR1) {
 
+        got_SIGUSR1 = 0;
+
         /* abrir fichero para leer los pids */
-        fp = fopen("pid.txt", "r");
+        fp = fopen("pids.txt", "r");
         if(fp == NULL) {
             perror("fopen");
             exit(1);
@@ -62,23 +80,49 @@ int votante(int nprocs, int candsem) {
 
         /* leer información del fichero para saber los pids */
         i = 0;
-        while(!feof(fp) && i < nprocs) {
-            fscanf(fp, "%d", pid);
+        while(fgets(bufpid, 30, fp) != NULL) {
+            pid = atoi(bufpid);
             /* si el pid es distinto del mio, lo guardo */
             if(pid != getpid()) {
                 pids[i] = pid;
                 i++;
             }
         }
-
         fclose(fp);
 
-        /* decidir si soy candidato o no */
-        /* semáforo !!! */
+        // this is not working !
+        if(sem_trywait(candsem) == -1 && errno == EAGAIN) {
 
-        sem_trywait(&sem);
+            printf("I'm voter %d\n", getpid());
 
-        if(candidato){
+            sigsuspend(&oldset);
+
+            /* no soy candidato */
+            if(got_SIGUSR2) {
+                /* abrir fichero para escribir los votos */
+                fp = fopen("votos.txt", "a");
+                if(fp == NULL) {
+                    perror("fopen");
+                    return EXIT_FAILURE;
+                }
+                /* decidir voto aleatorio */
+                voto = rand() % 2;
+                /* escribir voto en el fichero */
+                fprintf(fp, "%d\n", voto);
+                fclose(fp);
+
+                got_SIGUSR2 = 0;
+            }
+
+            /* espera hasta la siguiente ronda */
+            sigsuspend(&oldset);
+            
+
+        } else {
+
+            /* soy candidato */
+            printf("I'm candidate %d\n", getpid());
+
             /* abrir fichero para comprobar los votos */
             fp = fopen("votos.txt", "w+");
             if(fp == NULL) {
@@ -88,6 +132,7 @@ int votante(int nprocs, int candsem) {
 
             /* enviar señal SIGUSR2 a los demás procesos */
             for(i = 0; i < nprocs; i++) {
+                printf("pid: %d => %d\n", getpid(), pids[i]);
                 kill(pids[i], SIGUSR2);
             }
 
@@ -95,23 +140,23 @@ int votante(int nprocs, int candsem) {
             while(1) {
                 fseek(fp, 0, SEEK_END);
                 if(ftell(fp) == nprocs) {
-                    frewind(fp);
+                    rewind(fp);
                     break;
                 }
-                frewind(fp);
+                rewind(fp);
                 sleep(1000);
             }
 
-            fprintf(stdout, "Candidate %d => [", getpid());
+            fprintf(stdout, "Candidate %d => [ ", getpid());
 
             /* leer votos */
             while(!feof(fp)) {
-                fscanf(fp, "%d", voto);
+                fscanf(fp, "%d", &voto);
                 if(voto == 0) {
-                    fprintf(stdout, "N");
+                    fprintf(stdout, "N ");
                     no++;
                 } else {
-                    fprintf(stdout, "Y");
+                    fprintf(stdout, "Y ");
                     yes++;
                 }
             }
@@ -132,37 +177,13 @@ int votante(int nprocs, int candsem) {
 
         }
 
-        /* cuando reciba la señal SIGUSR2 */
-        if(got_SIGUSR2) {
-
-            /* abrir fichero para escribir los votos */
-            fp = fopen("votos.txt", "a");
-            if(fp == NULL) {
-                perror("fopen");
-                return EXIT_FAILURE;
-            }
-
-            /* decidir voto aleatorio */
-            voto = rand() % 2;
-
-            /* escribir voto en el fichero */
-            fprintf(fp, "%d\n", voto);
-            fclose(fp);
-
-            /* esperar a que termine la votación */
-            while(1){
-                sleep(1);
-            }
-            
+        if(got_SIGTERM) {
+            break;
         }
-
-
-
-
 
     }
 
-
+    free(pids);
     
-    return 0;
+    return EXIT_SUCCESS;
 }
