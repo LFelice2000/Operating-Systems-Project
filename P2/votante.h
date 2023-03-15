@@ -8,6 +8,6 @@
  * @param candsem 
  * @return int 
  */
-int votante(int nprocs, sem_t *candsem);
+int votante(int nprocs);
 
 #endif // VOTANTE_H
