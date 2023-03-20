@@ -33,7 +33,7 @@ int main(int argc, char *argv[]) {
     pid_t pid;
     char bufpid[30] = "\0";
     int nprocs = 0, i, *pids = NULL, semval = 0;
-    sem_t *sem;
+    sem_t *candsem = NULL, *votsem = NULL;
 
     struct sigaction act;
 
@@ -55,17 +55,30 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    /* Se crea el semáforo */
-    sem = sem_open("candsem", O_CREAT, 0644, 1);
-    if(sem == SEM_FAILED) {
+    /* Se crea el semáforo para elegir candidato */
+    candsem = sem_open("candsem", O_CREAT, 0644, 1);
+    if(candsem == SEM_FAILED) {
         perror("sem_open");
         exit(EXIT_FAILURE);
     }
 
     /* Se verifica si el semáforo está en 0 */
-    sem_getvalue(sem, &semval);
+    sem_getvalue(candsem, &semval);
     if(semval == 0) {
-        sem_post(sem);
+        sem_post(candsem);
+    }
+
+    /* Se crea el semáforo para votar */
+    votsem = sem_open("votsem", O_CREAT, 0644, 1);
+    if(votsem == SEM_FAILED) {
+        perror("sem_open");
+        exit(EXIT_FAILURE);
+    }
+
+    /* Se verifica si el semáforo está en 0 */
+    sem_getvalue(votsem, &semval);
+    if(semval == 0) {
+        sem_post(votsem);
     }
 
     /* Se crean los procesos votantes */
@@ -118,8 +131,13 @@ int main(int argc, char *argv[]) {
         waitpid(pids[i], NULL, 0);
     }
 
-    /* Se destruye el semáforo */
-    if(sem_destroy(sem) == -1) {
+    /* Se destruyen los semáforos */
+    if(sem_destroy(candsem) == -1) {
+        perror("sem_destroy");
+        exit(EXIT_FAILURE);
+    }
+
+    if(sem_destroy(votsem) == -1) {
         perror("sem_destroy");
         exit(EXIT_FAILURE);
     }
