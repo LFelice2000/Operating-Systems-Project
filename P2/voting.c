@@ -21,10 +21,14 @@
 #include "votante.h"
 
 int got_signal = 0;
+pid_t mainpid = 0;
 
 void handler(int sig) {
-    printf("Señal %d recibida\n", sig);
-    got_signal = 1;
+    if(sig == SIGINT) {
+        got_signal = 1;
+    }else if(sig == SIGALRM) {
+        got_signal = 2;
+    }
 }
 
 int main(int argc, char *argv[]) {
@@ -34,6 +38,7 @@ int main(int argc, char *argv[]) {
     char bufpid[30] = "\0";
     int nprocs = 0, i, *pids = NULL, semval = 0;
     sem_t *candsem = NULL, *votsem = NULL;
+    sigset_t set, oldset;
 
     struct sigaction act;
 
@@ -44,14 +49,37 @@ int main(int argc, char *argv[]) {
     
     nprocs = atoi(argv[1]);
     pids = (int *)malloc(nprocs * sizeof(int));
+    if(pids == NULL) {
+        perror("malloc");
+        exit(EXIT_FAILURE);
+    }
+
+    mainpid = getpid();
 
     /* Se configura la captura de señales */
     act.sa_handler = handler;
     sigemptyset(&act.sa_mask);
     act.sa_flags = 0;
 
+    /* Se bloquean las señales */
+    sigemptyset(&set);
+    sigaddset(&set, SIGINT);
+    sigaddset(&set, SIGALRM);
+
+    sigprocmask(SIG_BLOCK, &set, &oldset);
+
     if(sigaction(SIGINT, &act, NULL) < 0) {
         perror("sigaction");
+        exit(EXIT_FAILURE);
+    }
+
+    if(sigaction(SIGALRM, &act, NULL) < 0) {
+        perror("sigaction");
+        exit(EXIT_FAILURE);
+    }
+
+    if(alarm(atoi(argv[2])) < 0) {
+        perror("alarm");
         exit(EXIT_FAILURE);
     }
 
@@ -104,7 +132,6 @@ int main(int argc, char *argv[]) {
         } else if(pid == 0) {
             /* Se ejecuta el proceso votante */
             votante(nprocs);
-            exit(EXIT_SUCCESS);
         }
 
         i++;
@@ -112,18 +139,16 @@ int main(int argc, char *argv[]) {
 
     /* El proceso Principal envía la señal SIGUSR1 a todos los procesos votantes */
     for (i = 0; i < nprocs; i++){
-        printf("Enviando señal SIGUSR1 al proceso %d\n", pids[i]);
         kill(pids[i], SIGUSR1);
     }
 
-    sigsuspend(&act.sa_mask);
+    sigsuspend(&oldset);
 
-    /* Si el proceso Principal ha recibido SIGINT, envía SIGTERM a todos los procesos votantes */
+    /* Si el proceso Principal ha recibido SIGINT o SIGALRM, envía SIGTERM a todos los procesos votantes */
     if(got_signal){
         for (i = 0; i < nprocs; i++){
             kill(pids[i], SIGTERM);
         }
-        printf("Finishing by signal\n");
     }
 
     /* Se recogen a los procesos votantes */
@@ -131,16 +156,19 @@ int main(int argc, char *argv[]) {
         waitpid(pids[i], NULL, 0);
     }
 
-    /* Se destruyen los semáforos */
-    if(sem_destroy(candsem) == -1) {
-        perror("sem_destroy");
-        exit(EXIT_FAILURE);
+    if(got_signal == 1){
+        printf("Finishing by signal\n");
+    }else if(got_signal == 2){
+        printf("Finishing by alarm\n");
     }
 
-    if(sem_destroy(votsem) == -1) {
-        perror("sem_destroy");
-        exit(EXIT_FAILURE);
-    }
+    /* Se cierran los semáforos */
+    sem_close(candsem);
+    sem_close(votsem);
+
+    /* Se eliminan los semáforos */
+    sem_unlink("candsem");
+    sem_unlink("votsem");
 
     /* Se libera la memoria */
     free(pids);

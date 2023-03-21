@@ -9,7 +9,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/P2/voting",
-            "args": [ "3", "50" ],
+            "args": [ "4", "10" ],
             "environment": [{ "name": "config", "value": "Debug" }],
             "cwd": "${workspaceFolder}/P2",
         }

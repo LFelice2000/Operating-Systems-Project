@@ -14,7 +14,7 @@ monitor: monitor.o
 	gcc $(FLAGS) -o monitor.o
 
 minero.o: minero.c
-	gcc $(0FLAGS) -c minero.c
+	gcc $(FLAGS) -c minero.c
 
 votante.o: votante.c
 	gcc $(FLAGS) -c votante.c
