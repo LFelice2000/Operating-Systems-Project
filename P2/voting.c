@@ -131,8 +131,8 @@ int main(int argc, char *argv[]) {
             fclose(fpid);
 
         } else if(pid == 0) {
-            /* Se ejecuta el proceso votante */
-            votante(nprocs);
+            /* Cada proceso hijo ejecuta la función competicion */
+            competicion(nprocs);
         }
 
         i++;
@@ -150,17 +150,16 @@ int main(int argc, char *argv[]) {
         for (i = 0; i < nprocs; i++){
             kill(pids[i], SIGTERM);
         }
+        if(got_signal == 1){
+            printf("Finishing by signal\n");
+        }else if(got_signal == 2){
+            printf("Finishing by alarm\n");
+        }
     }
 
     /* Se recogen a los procesos votantes */
     for (i = 0; i < nprocs; i++){
         waitpid(pids[i], NULL, 0);
-    }
-
-    if(got_signal == 1){
-        printf("Finishing by signal\n");
-    }else if(got_signal == 2){
-        printf("Finishing by alarm\n");
     }
 
     /* Se cierran los semáforos */
@@ -175,4 +174,8 @@ int main(int argc, char *argv[]) {
     free(pids);
     
     exit(EXIT_SUCCESS);
+}
+
+void setup(){
+    
 }
