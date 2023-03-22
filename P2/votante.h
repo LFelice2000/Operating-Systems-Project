@@ -2,12 +2,10 @@
 #define VOTANTE_H
 
 /**
- * @brief 
+ * @brief Función que simula el comportamiento de un votante
  * 
- * @param nprocs 
- * @param candsem 
- * @return int 
+ * @param nprocs Número de procesos creados
  */
-int votante(int nprocs);
+void votante(int nprocs);
 
 #endif // VOTANTE_H

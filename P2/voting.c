@@ -21,7 +21,6 @@
 #include "votante.h"
 
 int got_signal = 0;
-pid_t mainpid = 0;
 
 void handler(int sig) {
     if(sig == SIGINT) {
@@ -34,9 +33,9 @@ void handler(int sig) {
 int main(int argc, char *argv[]) {
 
     FILE *fpid = NULL;
-    pid_t pid;
+    pid_t pid, *pids = NULL;
     char bufpid[30] = "\0";
-    int nprocs = 0, i, *pids = NULL, semval = 0;
+    int nprocs = 0, i, semval = 0;
     sem_t *candsem = NULL, *votsem = NULL;
     sigset_t set, oldset;
 
@@ -48,13 +47,11 @@ int main(int argc, char *argv[]) {
     }
     
     nprocs = atoi(argv[1]);
-    pids = (int *)malloc(nprocs * sizeof(int));
+    pids = (pid_t *) calloc (nprocs, sizeof(pid_t));
     if(pids == NULL) {
         perror("malloc");
         exit(EXIT_FAILURE);
     }
-
-    mainpid = getpid();
 
     /* Se configura la captura de señales */
     act.sa_handler = handler;
@@ -121,6 +118,10 @@ int main(int argc, char *argv[]) {
             fpid = fopen("pids.txt", "a+");
             if(fpid == NULL) {
                 perror("open");
+                sem_close(candsem);
+                sem_close(votsem);
+                sem_unlink("candsem");
+                sem_unlink("votsem");
                 exit(EXIT_FAILURE);
             }
 
