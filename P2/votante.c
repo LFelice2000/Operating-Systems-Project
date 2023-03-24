@@ -34,8 +34,6 @@ struct sigaction act;
 
 void sighandler(int sig) {
 
-    int semval = 0;
-
     if(sig == SIGUSR1){
         got_SIGUSR1 = 1;
     }else if(sig == SIGUSR2){
@@ -150,6 +148,9 @@ void candidato(int nprocs, sem_t *candsem, sem_t *votsem){
     FILE *fp = NULL;
     int voto = 0, i = 0, yes = 0, no = 0;
 
+    /* bloquear señal SIGTERM */
+    sigprocmask(SIG_BLOCK, &termset, NULL);
+
     /* abrir fichero donde se guardan los votos */
     fp = fopen("votos.txt", "w");
     if(fp == NULL) {
@@ -157,6 +158,9 @@ void candidato(int nprocs, sem_t *candsem, sem_t *votsem){
         return;
     }
     fclose(fp);
+
+    /* desbloquear señal SIGTERM */
+    sigprocmask(SIG_UNBLOCK, &termset, NULL);
 
     /* enviar señal SIGUSR2 a los demás procesos */
     for(i = 0; i < nprocs-1; i++) {
@@ -167,6 +171,8 @@ void candidato(int nprocs, sem_t *candsem, sem_t *votsem){
 
         /* se accede a la sección crítica */
         sem_wait(votsem);
+
+        sigprocmask(SIG_BLOCK, &termset, NULL);
 
         /* abrir fichero para leer los votos */
         fp = fopen("votos.txt", "r");
@@ -216,6 +222,8 @@ void candidato(int nprocs, sem_t *candsem, sem_t *votsem){
             sem_post(votsem);
             sem_post(candsem);
 
+            sigprocmask(SIG_UNBLOCK, &termset, NULL);
+
             /* enviar señal SIGUSR1 a los demás procesos */
             for(i = 0; i < nprocs-1; i++) {
                 kill(pids[i], SIGUSR1);
@@ -230,6 +238,8 @@ void candidato(int nprocs, sem_t *candsem, sem_t *votsem){
 
         rewind(fp);
         fclose(fp);
+
+        sigprocmask(SIG_UNBLOCK, &termset, NULL);
 
         /* no todos los votos han sido contabilizados */
         /* se sale de la sección crítica */

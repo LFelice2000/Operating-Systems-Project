@@ -36,7 +36,7 @@ int main(int argc, char *argv[]) {
     FILE *fpid = NULL;
     pid_t pid, *pids = NULL;
     char bufpid[30] = "\0";
-    int nprocs = 0, i, semval = 0;
+    int nprocs = 0, i = 0;
     sem_t *candsem = NULL, *votsem = NULL;
     sigset_t set, oldset;
 
@@ -88,23 +88,11 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    /* Se verifica si el semáforo está en 0 */
-    sem_getvalue(candsem, &semval);
-    if(semval == 0) {
-        sem_post(candsem);
-    }
-
     /* Se crea el semáforo para votar */
     votsem = sem_open("/votsem", O_CREAT | O_EXCL, S_IRUSR | S_IWUSR, 1);
     if(votsem == SEM_FAILED) {
         perror("sem_open");
         exit(EXIT_FAILURE);
-    }
-
-    /* Se verifica si el semáforo está en 0 */
-    sem_getvalue(votsem, &semval);
-    if(semval == 0) {
-        sem_post(votsem);
     }
 
     /* Se crean los procesos votantes */
