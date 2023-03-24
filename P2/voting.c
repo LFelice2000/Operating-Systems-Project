@@ -18,6 +18,7 @@
 #include <string.h>
 #include <semaphore.h>
 #include <fcntl.h>
+#include <sys/stat.h>
 #include "votante.h"
 
 int got_signal = 0;
@@ -81,7 +82,7 @@ int main(int argc, char *argv[]) {
     }
 
     /* Se crea el semáforo para elegir candidato */
-    candsem = sem_open("candsem", O_CREAT, 0644, 1);
+    candsem = sem_open("/candsem", O_CREAT | O_EXCL, S_IRUSR | S_IWUSR, 1);
     if(candsem == SEM_FAILED) {
         perror("sem_open");
         exit(EXIT_FAILURE);
@@ -94,7 +95,7 @@ int main(int argc, char *argv[]) {
     }
 
     /* Se crea el semáforo para votar */
-    votsem = sem_open("votsem", O_CREAT, 0644, 1);
+    votsem = sem_open("/votsem", O_CREAT | O_EXCL, S_IRUSR | S_IWUSR, 1);
     if(votsem == SEM_FAILED) {
         perror("sem_open");
         exit(EXIT_FAILURE);
@@ -127,12 +128,14 @@ int main(int argc, char *argv[]) {
 
             sprintf(bufpid, "%d\n", pid);
             fwrite(bufpid, strlen(bufpid), 1, fpid);
-            fflush(fpid);
             fclose(fpid);
 
         } else if(pid == 0) {
+            /* Se libera la memoria innecesaria */
+            free(pids);
+
             /* Cada proceso hijo ejecuta la función competicion */
-            competicion(nprocs);
+            competicion(nprocs, candsem, votsem);
         }
 
         i++;
@@ -167,15 +170,11 @@ int main(int argc, char *argv[]) {
     sem_close(votsem);
 
     /* Se eliminan los semáforos */
-    sem_unlink("candsem");
-    sem_unlink("votsem");
+    sem_unlink("/candsem");
+    sem_unlink("/votsem");
 
     /* Se libera la memoria */
     free(pids);
     
     exit(EXIT_SUCCESS);
-}
-
-void setup(){
-    
 }

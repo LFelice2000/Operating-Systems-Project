@@ -33,6 +33,9 @@ sigset_t set, oldset, termset;
 struct sigaction act;
 
 void sighandler(int sig) {
+
+    int semval = 0;
+
     if(sig == SIGUSR1){
         got_SIGUSR1 = 1;
     }else if(sig == SIGUSR2){
@@ -43,15 +46,17 @@ void sighandler(int sig) {
         sem_close(votsem);
         exit(EXIT_SUCCESS);
     }
+
 }
 
-void competicion(int nprocs) {
+void competicion(int nprocs, sem_t *csem, sem_t *vsem) {
 
     FILE *fp = NULL;
     char bufpid[30] = "\0";
     pid_t pid;
     int i;
 
+    /* se reserva memoria para los pids */
     pids = (pid_t *) malloc((nprocs-1) * sizeof(pid_t));
     if(pids == NULL) {
         perror("malloc");
@@ -62,7 +67,8 @@ void competicion(int nprocs) {
     señales();
 
     /* configurar semaforos */
-    semaforos();
+    candsem = csem;
+    votsem = vsem;
 
     /* esperar a que el sistema esté listo y reciba SIGUSR1 */
     while(got_SIGUSR1 == 0) {
@@ -87,15 +93,16 @@ void competicion(int nprocs) {
     }
     fclose(fp);
 
+    /* Rondas de votación */
     while(got_SIGUSR1) {
 
         got_SIGUSR1 = 0;
 
         /* decidir si soy candidato o no */
         if(sem_trywait(candsem) == 0) {
-            candidato(nprocs);
+            candidato(nprocs, candsem, votsem);
         }else{
-            votante();
+            votante(votsem);
         }
 
     }
@@ -138,26 +145,7 @@ void señales(){
     return;
 }
 
-void semaforos(){
-
-    /* abrir semáforo de candidato */
-    candsem = sem_open("candsem", 0);
-    if(candsem == SEM_FAILED) {
-        perror("sem_open");
-        exit(1);
-    }
-
-    /* abrir semáforo de votos */
-    votsem = sem_open("votsem", 0);
-    if(votsem == SEM_FAILED) {
-        perror("sem_open");
-        exit(1);
-    }
-
-    return;
-}
-
-void candidato(int nprocs){
+void candidato(int nprocs, sem_t *candsem, sem_t *votsem){
 
     FILE *fp = NULL;
     int voto = 0, i = 0, yes = 0, no = 0;
@@ -177,6 +165,7 @@ void candidato(int nprocs){
 
     while(1){
 
+        /* se accede a la sección crítica */
         sem_wait(votsem);
 
         /* abrir fichero para leer los votos */
@@ -243,6 +232,7 @@ void candidato(int nprocs){
         fclose(fp);
 
         /* no todos los votos han sido contabilizados */
+        /* se sale de la sección crítica */
         sem_post(votsem);
         usleep(10000);
     }
@@ -250,7 +240,7 @@ void candidato(int nprocs){
     return;
 }
 
-void votante(){
+void votante(sem_t *votsem){
 
     FILE *fp = NULL;
     int voto = 0;

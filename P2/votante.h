@@ -12,34 +12,34 @@
 #define VOTANTE_H
 
 /**
- * @brief 
+ * @brief Funcion que se encarga de la competición entre los procesos votantes
  * 
- * @param nprocs 
+ * @param nprocs número de procesos votantes
+ * @param candsem semáforo para elegir candidato
+ * @param votsem semáforo para acceder al archivo de votos
  */
-void competicion(int nprocs);
+void competicion(int nprocs, sem_t *candsem, sem_t *votsem);
 
 /**
- * @brief 
+ * @brief Función que se encarga de la configuración de señales
  * 
  */
 void señales();
 
 /**
- * @brief 
+ * @brief Función que se encarga de la elección del candidato
  * 
+ * @param nprocs número de procesos votantes
+ * @param candsem semáforo para elegir candidato
+ * @param votsem semáforo para acceder al archivo de votos
  */
-void semaforos();
+void candidato(int nprocs, sem_t *candsem, sem_t *votsem);
 
 /**
- * @brief 
+ * @brief Función que se encarga de la votación
  * 
+ * @param votsem semáforo para acceder al archivo de votos
  */
-void candidato(int nprocs);
-
-/**
- * @brief 
- * 
- */
-void votante();
+void votante(sem_t *votsem);
 
 #endif // VOTANTE_H
