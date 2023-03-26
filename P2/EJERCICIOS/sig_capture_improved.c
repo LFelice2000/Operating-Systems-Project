@@ -1,3 +1,26 @@
+/**
+ * @file sig_capture_improved.c
+ * @author your name (you@domain.com)
+ * @brief 
+ * @version 0.1
+ * @date 2023-03-27
+ * 
+ * @copyright Copyright (c) 2023
+ * 
+ * a) En esta versi ́on mejorada del programa del Ejercicio 3, ¿en qu ́e l ́ıneas se realiza
+ * realmente la gesti ́on de la se ̃nal?
+ * 
+ * Dentro del bucle while, se comprueba si se ha recibido la señal. Si se ha
+ * recibido, se ejecuta el código que se encuentra dentro del if.
+ * 
+ * b) ¿Por qu ́e, en este caso, se permite el uso de variables globales?
+ * 
+ * Porque de esta manera, se puede acceder a la variable got_signal desde
+ * cualquier parte del programa, teniendo en cuenta que la llamada a la función
+ * handler es asíncrona.
+ * 
+ */
+
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>

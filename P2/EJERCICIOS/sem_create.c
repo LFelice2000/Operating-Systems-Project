@@ -1,3 +1,22 @@
+/**
+ * @file sem_create.c
+ * @author your name (you@domain.com)
+ * @brief 
+ * @version 0.1
+ * @date 2023-03-27
+ * 
+ * @copyright Copyright (c) 2023
+ * 
+ * ¿Podr ́ıa modificarse el sitio de llamada a sem_unlink? En caso afirmativo, ¿cu ́al ser ́ıa la
+ * primera posici ́on en la que se ser ́ıa correcto llamar a sem_unlink?
+ * 
+ * No, porque si se llama a sem_unlink antes de que se llame a sem_close, se
+ * eliminaría el semáforo antes de que se pueda cerrar. Por lo tanto, la primera
+ * posición en la que se sería correcto llamar a sem_unlink sería justo antes de
+ * que se llame a exit en el padre y después de recoger el proceso hijo.
+ * 
+ */
+
 #include <fcntl.h>
 #include <semaphore.h>
 #include <stdio.h>
@@ -58,9 +77,9 @@ int main(void) {
     printf("End of critical region (parent)\n");
     sem_post(sem);
     sem_close(sem);
-    sem_unlink(SEM_NAME);
 
     wait(NULL);
+    sem_unlink(SEM_NAME);
     exit(EXIT_SUCCESS);
   }
 }
