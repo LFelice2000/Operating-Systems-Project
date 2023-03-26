@@ -104,14 +104,26 @@ int main(int argc, char *argv[]) {
             /* Se guarda el pid del proceso votante */
             pids[i] = pid;
 
-            fpid = fopen("pids.txt", "a+");
-            if(fpid == NULL) {
-                perror("open");
-                sem_close(candsem);
-                sem_close(votsem);
-                sem_unlink("candsem");
-                sem_unlink("votsem");
-                exit(EXIT_FAILURE);
+            if(i == 0) {
+                fpid = fopen("pids.txt", "w");
+                if(fpid == NULL) {
+                    perror("open");
+                    sem_close(candsem);
+                    sem_close(votsem);
+                    sem_unlink("candsem");
+                    sem_unlink("votsem");
+                    exit(EXIT_FAILURE);
+                }
+            } else {
+                fpid = fopen("pids.txt", "a+");
+                if(fpid == NULL) {
+                    perror("open");
+                    sem_close(candsem);
+                    sem_close(votsem);
+                    sem_unlink("candsem");
+                    sem_unlink("votsem");
+                    exit(EXIT_FAILURE);
+                }
             }
 
             sprintf(bufpid, "%d\n", pid);
