@@ -18,11 +18,13 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <string.h>
+#include <mqueue.h>
 #include "monitor.h"
 
-#define SHM_NAME "/shm_monitor"
-#define TEST_MSG "test1", "test2", "test3", "test4", "test5", "test6", "test7", "end"
 #define BUFFER_SIZE 6
+#define SHM_NAME "/shm_monitor"
+#define MQ_LEN 7
+#define MQ_NAME "/queue_minero"
 
 int main(int argc, char *argv[]) {
 
@@ -64,9 +66,13 @@ int main(int argc, char *argv[]) {
 void comprobador(int lag, int fd_shm) {
 
     shm_struct *shm_struc = NULL;
-    char test[8][MAX_MSG] = {TEST_MSG};
     char recv[MAX_MSG] = "\0";
-    int i = 0, exit_loop = 1;
+    int i = 0, exit_loop = 1, prior;
+    mqd_t mq;
+    struct mq_attr attributes;
+
+    attributes.mq_maxmsg = 10;
+    attributes.mq_msgsize = MAX_MSG;
     
     printf("[%d] checking blocks...\n", getpid());
     
@@ -93,29 +99,37 @@ void comprobador(int lag, int fd_shm) {
     /* Introduce bloque en memoria compartida */
     i = 0;
     while(exit_loop){
-        
-        if ( mq_receive ( mq , aux , MAX_MESSAGE , & prior ) == -1) {
+
+
+        if ((mq = mq_open(MQ_NAME, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, &attributes)) == ( mqd_t ) -1) {
+            perror("mq_open") ;
+            exit(EXIT_FAILURE) ;
+        }
+
+        if (mq_receive (mq, recv, MAX_MSG, &prior) == -1) {
             perror (" mq_receive ") ;
-            mq_close ( mq ) ;
+            mq_close (mq) ;
             exit ( EXIT_FAILURE ) ;
         }
-        
-        memcpy(recv, test[i], sizeof(test[i]));
-        if(strcmp(recv, "end") == 0) {
-            exit_loop = 0;
-        }
+
+        printf("Mensaje recibido: %s\n", recv);
 
         sem_wait(&shm_struc->sem_empty);
         sem_wait(&shm_struc->sem_mutex);
         
-        printf("Writing to shared memory segment...\n");
-        shm_struc->rear++;
-        if(shm_struc->rear == BUFFER_SIZE){
-            shm_struc->rear = 0;
-        }
+        if(strcmp(recv, "end") == 0) {
+            printf("ending...");
+            exit_loop = 0;
+        } else {
+            printf("Writing to shared memory segment...\n");
+            shm_struc->rear++;
+            if(shm_struc->rear == BUFFER_SIZE){
+                shm_struc->rear = 0;
+            }
 
-        shm_struc->rear = shm_struc->rear % BUFFER_SIZE;
-        memcpy(shm_struc->buffer[shm_struc->rear].msg, test[i], sizeof(test[i]));
+            shm_struc->rear = shm_struc->rear % BUFFER_SIZE;
+            memcpy(shm_struc->buffer[shm_struc->rear].msg, recv, sizeof(recv));
+        }
 
         sem_post(&shm_struc->sem_mutex);
         sem_post(&shm_struc->sem_fill);
@@ -132,6 +146,7 @@ void comprobador(int lag, int fd_shm) {
     /* Unmap shared memory segment */
     munmap(shm_struc, sizeof(shm_struct));
     shm_unlink (SHM_NAME);
+    mq_close(mq) ;
 
     return;
 }
