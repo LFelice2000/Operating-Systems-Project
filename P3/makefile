@@ -4,14 +4,17 @@ LIBS = -lpthread
 
 all: $(EXE)
 
-miner: miner.o
-	gcc $(FLAGS) -o miner miner.o $(LIBS)
+pow.o: pow.c pow.h
+	gcc $(FLAGS) -c pow.c
+
+miner: miner.o pow.o
+	gcc $(FLAGS) -o miner miner.o pow.o $(LIBS)
 
 miner.o: miner.c
 	gcc $(FLAGS) -c miner.c
 
-monitor: monitor.o
-	gcc $(FLAGS) -o monitor monitor.o $(LIBS)
+monitor: monitor.o pow.o
+	gcc $(FLAGS) -o monitor monitor.o pow.o $(LIBS)
 
 clean:
 	rm -f *.o $(EXE)

@@ -16,25 +16,36 @@
 #include <unistd.h>
 #include <mqueue.h>
 #include "monitor.h"
+#include "pow.h"
 
 #define MQ_LEN 7
 #define MQ_NAME "/queue_minero"
-#define TEST_MSG "test1", "test2", "test3", "test4", "test5", "test6", "test7", "end"
+
+/**
+ * @brief Función que realiza la prueba de fuerza
+ * 
+ * @param target objetivo a resolver
+ * @return int solución del problema de la prueba de fuerza
+ */
+int prueba_de_fuerza(int target);
 
 int main(int argc, char *argv[]) {
     mqd_t mq;
     struct mq_attr attributes;
-    int i, lag;
-    char test[8][MAX_MSG] = {TEST_MSG};
+    int i, lag, nrounds = 0, target, res;
+    char msg[MAX_MSG];
 
-    if(argc != 2) {
-        printf("Error, el programa debe ejecutarse como: ./monitor <LAG>\n");
+    if(argc < 3) {
+        printf("Error, el programa debe ejecutarse como: ./monitor <ROUNDS> <LAG>\n");
         exit(EXIT_FAILURE);
     }
 
-    lag = atoi(argv[1]);
+    /* Obtener los argumentos */
+    nrounds = atoi(argv[1]);
+    lag = atoi(argv[2]);
 
-    attributes.mq_maxmsg = 10;
+    /* Crear la cola de mensajes */
+    attributes.mq_maxmsg = MQ_LEN;
     attributes.mq_msgsize = MAX_MSG;
 
     if ((mq = mq_open(MQ_NAME, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, &attributes)) == ( mqd_t ) -1) {
@@ -42,18 +53,58 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE) ;
     }
 
-    for(i = 0; i < 8; i++) {
-        printf("Enviando mensaje: %s\n", test[i]);
-        if (mq_send(mq, test[i], strlen(test[i]) + 1, 1) == -1) {
+    target = 0;
+    printf("[%d] Generating blocks...\n", getpid());
+
+    /* Empezar las rondas de prueba de fuerza */
+    for(i = 0; i < nrounds; i++) {
+
+        res = prueba_de_fuerza(target);
+
+        /* El formato del mensaje será target-res */
+        sprintf(msg, "%d-%d", target, res);
+
+        /* Enviar el mensaje */
+        if (mq_send(mq, msg, strlen(msg)+1, 1) == -1) {
             perror("mq_send") ;
             mq_close(mq) ;
             exit(EXIT_FAILURE) ;
         }
 
-        sleep(lag);
+        /* Esperar el tiempo de lag */
+        usleep(lag);
+
+        /* Obtener el nuevo target */
+        target = res;
+        
     }
 
+    /* Enviar mensaje de finalización */
+    strcpy(msg, "end");
+
+    if (mq_send(mq, msg, strlen(msg) + 1, 1) == -1) {
+        perror("mq_send") ;
+        mq_close(mq) ;
+        exit(EXIT_FAILURE) ;
+    }
+
+    /* Cerrar la cola de mensajes */
     mq_close(mq);
 
+    printf("[%d] Finishing\n", getpid());
+
     exit(EXIT_SUCCESS);
+}
+
+int prueba_de_fuerza(int target){
+
+    int i;
+
+    for(i = 0; i < POW_LIMIT - 1; i++){
+        if(pow_hash(i) == target){
+            break;
+        }
+    }
+    
+    return i;
 }

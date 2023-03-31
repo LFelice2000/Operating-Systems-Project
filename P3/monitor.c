@@ -19,7 +19,9 @@
 #include <sys/types.h>
 #include <string.h>
 #include <mqueue.h>
+#include <semaphore.h>
 #include "monitor.h"
+#include "pow.h"
 
 #define BUFFER_SIZE 6
 #define SHM_NAME "/shm_monitor"
@@ -36,19 +38,20 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    /* Get argument */
+    /* Obtener los argumentos */
     lag = atoi(argv[1]);
 
-    /* Create shared memory segment or open it */
+    /* Crear segmento de memoria compartida o abrirlo si ya existe */
     fd_shm = shm_open(SHM_NAME, O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
     if (fd_shm == -1) {
         if (errno == EEXIST) {
+            /* Si ya existe, soy el proceso Monitor y abro el segmento de memoria */
             fd_shm = shm_open(SHM_NAME, O_RDWR, 0);
             if (fd_shm == -1) {
                 perror ("Error opening the shared memory segment\n");
                 exit(EXIT_FAILURE);
             }
-            printf("Soy monitor\n");
+
             monitor(lag, fd_shm);
             exit(EXIT_SUCCESS);
         } else {
@@ -56,33 +59,34 @@ int main(int argc, char *argv[]) {
             exit(EXIT_FAILURE) ;
         }
     }
-    printf("Created shared memory segment: %d\n", fd_shm);
+
+    /* He creado el segmento de memoria y soy el proceso Comprobador */
     comprobador(lag, fd_shm);
 
     return 0;
 }
 
-/**Productor*/
 void comprobador(int lag, int fd_shm) {
 
     shm_struct *shm_struc = NULL;
-    char recv[MAX_MSG] = "\0";
-    int i = 0, exit_loop = 1, prior;
-    mqd_t mq;
     struct mq_attr attributes;
+    mqd_t mq;
+    char recv[MAX_MSG] = "\0";
+    int exit_loop = 0, prior;
 
     attributes.mq_maxmsg = 10;
     attributes.mq_msgsize = MAX_MSG;
     
-    printf("[%d] checking blocks...\n", getpid());
+    printf("[%d] Checking blocks...\n", getpid());
     
-    /* Inicializar segmento de memoria compartida */
+    /* Establecer tamaño del segmento de memoria compartida */
     if (ftruncate(fd_shm , sizeof(shm_struct)) == -1) {
         perror ("ftruncate");
         shm_unlink ( SHM_NAME );
         exit (EXIT_FAILURE);
     }
 
+    /* Mapeo de segmento de memoria */
     shm_struc = mmap(NULL, sizeof(shm_struct), PROT_READ | PROT_WRITE, MAP_SHARED, fd_shm, 0) ;
     close (fd_shm);
     if (shm_struc == MAP_FAILED) {
@@ -91,65 +95,62 @@ void comprobador(int lag, int fd_shm) {
         exit (EXIT_FAILURE);
     }
 
+    /* Inicializar estructura de memoria compartida */
     init_struct(shm_struc);
 
-    /* Recibe bloque de cola de mensajes */
-    /* WHILE (1) */
-
     /* Introduce bloque en memoria compartida */
-    i = 0;
-    while(exit_loop){
+    while(exit_loop == 0){
 
-
-        if ((mq = mq_open(MQ_NAME, O_CREAT | O_RDWR , S_IRUSR | S_IWUSR, &attributes)) == ( mqd_t ) -1) {
+        /* Abrir cola de mensajes */
+        if ((mq = mq_open(MQ_NAME, O_CREAT | O_RDWR , S_IRUSR | S_IWUSR, &attributes)) == (mqd_t) -1) {
             perror("mq_open") ;
             exit(EXIT_FAILURE) ;
         }
-        
         fflush(stdout);
-        printf("Wating for message...\n");
 
-        if (mq_receive (mq, recv, MAX_MSG, &prior) == -1) {
-            perror (" mq_receive ") ;
-            mq_close (mq) ;
-            exit ( EXIT_FAILURE ) ;
+        /* Recibe el bloque por la cola de mensajes */
+        if (mq_receive(mq, recv, MAX_MSG, &prior) == -1) {
+            perror ("mq_receive");
+            mq_close(mq);
+            exit(EXIT_FAILURE);
         }
 
-        printf("Mensaje recibido: %s\n", recv);
+        /* Comprueba si es el bloque de finalización */
+        if(strcmp(recv, "end") == 0) {
+            exit_loop = 1;
+        }
 
+        /* Espera a que haya espacio en el buffer */
         sem_wait(&shm_struc->sem_empty);
+
+        /* Protegemos el acceso a memoria compartida */
         sem_wait(&shm_struc->sem_mutex);
 
+        /* Escribir bloque en memoria compartida */
         shm_struc->rear++;
-            if(shm_struc->rear == BUFFER_SIZE){
-                shm_struc->rear = 0;
-            }
+        if(shm_struc->rear == BUFFER_SIZE){
+            shm_struc->rear = 0;
+        }
 
         shm_struc->rear = shm_struc->rear % BUFFER_SIZE;
-        
-        if(strcmp(recv, "end") == 0) {
-            printf("ending...");
-            exit_loop = 0;
-        } else {
-            printf("Writing to shared memory segment...\n");
-        }
         memcpy(shm_struc->buffer[shm_struc->rear].msg, recv, sizeof(recv));
 
         sem_post(&shm_struc->sem_mutex);
         sem_post(&shm_struc->sem_fill);
         
-        sleep(lag);
-        i++;
+        /* Espera */
+        usleep(lag);
+
     }
 
-    /* Destroy semaphores */
-    sem_destroy(&shm_struc->sem_mutex);
-    sem_destroy(&shm_struc->sem_empty);
-    sem_destroy(&shm_struc->sem_fill);
-
-    /* Unmap shared memory segment */
+    /* Se desasocia el segmento de memoria compartida */
     munmap(shm_struc, sizeof(shm_struct));
-    mq_close(mq) ;
+
+    /* Se cierra la cola de mensajes y se elimina porque somos el último proceso en usarla */
+    mq_close(mq);
+    mq_unlink(MQ_NAME);
+
+    printf("[%d] Finishing\n", getpid());
 
     return;
 }
@@ -157,8 +158,10 @@ void comprobador(int lag, int fd_shm) {
 void monitor(int lag, int fd_shm) {
 
     shm_struct *shm_struc = NULL;
-    int end_loop = 1;
-    printf("[%d] checking blocks...\n", getpid());
+    int end_loop = 0, flag;
+    long int target, res;
+
+    printf("[%d] Printing blocks...\n", getpid());
     
     /* Mapeo de segmento de memoria */
     shm_struc = mmap(NULL, sizeof(shm_struct), PROT_READ | PROT_WRITE, MAP_SHARED, fd_shm, 0) ;
@@ -166,15 +169,18 @@ void monitor(int lag, int fd_shm) {
     if (shm_struc == MAP_FAILED) {
         perror ("mmap") ;
         shm_unlink(SHM_NAME);
-        exit (EXIT_FAILURE);
+        exit(EXIT_FAILURE);
     }
     
     /* Extrae bloque de memoria compartida */
-    while(end_loop){
+    while(end_loop == 0){
 
+        /* Espera a que haya un bloque en el buffer */
         sem_wait(&shm_struc->sem_fill);
+        /* Protegemos el acceso a memoria compartida */
         sem_wait(&shm_struc->sem_mutex);
 
+        /* Leer bloque de memoria compartida */
         shm_struc->front++;
         if(shm_struc->front == BUFFER_SIZE){
             shm_struc->front = 0;
@@ -182,42 +188,60 @@ void monitor(int lag, int fd_shm) {
 
         shm_struc->front = shm_struc->front % BUFFER_SIZE;
 
+        /* Comprueba si es el bloque de finalización */
         if(strcmp(shm_struc->buffer[shm_struc->front].msg, "end") == 0) {
-            printf("ending...\n");
-            end_loop = 0;
-        }
-        else {
-            printf("The shared memory segment contains: %s\n", shm_struc->buffer[shm_struc->front].msg);
+            end_loop = 1;
+        } else {
+            /* Leer objetivo y solución */
+            sscanf(shm_struc->buffer[shm_struc->front].msg, "%ld-%ld", &target, &res);
+            
+            /* Comprobar solución */
+            flag = comprobar(target, res);
+            if(flag == 1) {
+                printf("Solution accepted: %08ld --> %08ld\n", target, res);
+            } else {
+                printf("Solution rejected: %08ld --> %08ld\n", target, res);
+            }
         }
         
         sem_post(&shm_struc->sem_mutex);
         sem_post(&shm_struc->sem_empty);
 
-        sleep(lag);
+        /* Espera */
+        usleep(lag);
     }
 
-    /* Unmap shared memory segment */
+    /* Se destruyen los semáforos sin nombre porque somos el último proceso en usarlos */
+    sem_destroy(&shm_struc->sem_mutex);
+    sem_destroy(&shm_struc->sem_empty);
+    sem_destroy(&shm_struc->sem_fill);
+
+    /* Se desasocia el segmento de memoria compartida */
     munmap(shm_struc, sizeof(shm_struct));
-    shm_unlink (SHM_NAME);
+    shm_unlink(SHM_NAME);
+
+    printf("[%d] Finishing\n", getpid());
 
     return;
 
 }
 
 void init_struct(shm_struct *shm_struc) {
-    int i;
 
     if (shm_struc == NULL) {
         return;
     }
 
+    /* Inicializar front y rear del buffer circular */
     shm_struc->front = -1;
     shm_struc->rear = -1;
 
+    /* Inicializar semáforos sin nombre a utilizar */
     if(sem_init(&shm_struc->sem_mutex, 1, 1) == -1){
         perror("sem_init");
         exit(EXIT_FAILURE);
     }
+
     if(sem_init(&shm_struc->sem_empty, 1, (BUFFER_SIZE - 1)) == -1){
         perror("sem_init");
         exit(EXIT_FAILURE);
@@ -226,5 +250,19 @@ void init_struct(shm_struct *shm_struc) {
     if(sem_init(&shm_struc->sem_fill, 1, 0) == -1){
         perror("sem_init");
         exit(EXIT_FAILURE);
-    }   
+    }
+
+}
+
+
+int comprobar(int target, int res) {
+
+    int flag = 0;
+
+    if(target ==  pow_hash(res)) {
+        flag = 1;
+    }
+    
+    return flag;
+
 }
