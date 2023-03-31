@@ -1,0 +1,6 @@
+# No guardar punteros en la memoria compartida
+# no guardar direcciones de memoria
+# que los permisos de shm_open coincidan con los de mmap
+# se comparte semáforo sin nombre (NO POINTER)
+
+
