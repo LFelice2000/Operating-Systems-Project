@@ -1,17 +1,17 @@
-EXE = voting
+EXE = miner monitor
 FLAGS = -g -pedantic
 LIBS = -lpthread
 
 all: $(EXE)
 
-votante.o: votante.c
-	gcc $(FLAGS) -c votante.c
+miner: miner.o
+	gcc $(FLAGS) -o miner miner.o $(LIBS)
 
-voting.o: voting.c
-	gcc $(FLAGS) -c voting.c
+miner.o: miner.c
+	gcc $(FLAGS) -c miner.c
 
-voting: voting.o votante.o
-	gcc $(FLAGS) -o voting voting.o votante.o $(LIBS)
+monitor: monitor.o
+	gcc $(FLAGS) -o monitor monitor.o $(LIBS)
 
 clean:
-	rm -f *.o $(EXE) *.txt
+	rm -f *.o $(EXE)
