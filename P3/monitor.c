@@ -101,10 +101,13 @@ void comprobador(int lag, int fd_shm) {
     while(exit_loop){
 
 
-        if ((mq = mq_open(MQ_NAME, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, &attributes)) == ( mqd_t ) -1) {
+        if ((mq = mq_open(MQ_NAME, O_CREAT | O_RDWR , S_IRUSR | S_IWUSR, &attributes)) == ( mqd_t ) -1) {
             perror("mq_open") ;
             exit(EXIT_FAILURE) ;
         }
+        
+        fflush(stdout);
+        printf("Wating for message...\n");
 
         if (mq_receive (mq, recv, MAX_MSG, &prior) == -1) {
             perror (" mq_receive ") ;
@@ -116,20 +119,21 @@ void comprobador(int lag, int fd_shm) {
 
         sem_wait(&shm_struc->sem_empty);
         sem_wait(&shm_struc->sem_mutex);
+
+        shm_struc->rear++;
+            if(shm_struc->rear == BUFFER_SIZE){
+                shm_struc->rear = 0;
+            }
+
+        shm_struc->rear = shm_struc->rear % BUFFER_SIZE;
         
         if(strcmp(recv, "end") == 0) {
             printf("ending...");
             exit_loop = 0;
         } else {
             printf("Writing to shared memory segment...\n");
-            shm_struc->rear++;
-            if(shm_struc->rear == BUFFER_SIZE){
-                shm_struc->rear = 0;
-            }
-
-            shm_struc->rear = shm_struc->rear % BUFFER_SIZE;
-            memcpy(shm_struc->buffer[shm_struc->rear].msg, recv, sizeof(recv));
         }
+        memcpy(shm_struc->buffer[shm_struc->rear].msg, recv, sizeof(recv));
 
         sem_post(&shm_struc->sem_mutex);
         sem_post(&shm_struc->sem_fill);
@@ -145,7 +149,6 @@ void comprobador(int lag, int fd_shm) {
 
     /* Unmap shared memory segment */
     munmap(shm_struc, sizeof(shm_struct));
-    shm_unlink (SHM_NAME);
     mq_close(mq) ;
 
     return;
@@ -178,6 +181,7 @@ void monitor(int lag, int fd_shm) {
         }
 
         shm_struc->front = shm_struc->front % BUFFER_SIZE;
+
         if(strcmp(shm_struc->buffer[shm_struc->front].msg, "end") == 0) {
             printf("ending...\n");
             end_loop = 0;
@@ -194,6 +198,7 @@ void monitor(int lag, int fd_shm) {
 
     /* Unmap shared memory segment */
     munmap(shm_struc, sizeof(shm_struct));
+    shm_unlink (SHM_NAME);
 
     return;
 
@@ -218,7 +223,7 @@ void init_struct(shm_struct *shm_struc) {
         exit(EXIT_FAILURE);
     }
 
-    if(sem_init(&shm_struc->sem_fill, 1, 1) == -1){
+    if(sem_init(&shm_struc->sem_fill, 1, 0) == -1){
         perror("sem_init");
         exit(EXIT_FAILURE);
     }   

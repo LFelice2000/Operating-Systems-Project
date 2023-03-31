@@ -13,6 +13,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <sys/stat.h>
+#include <unistd.h>
 #include <mqueue.h>
 #include "monitor.h"
 
@@ -23,8 +24,15 @@
 int main(int argc, char *argv[]) {
     mqd_t mq;
     struct mq_attr attributes;
-    int i;
+    int i, lag;
     char test[8][MAX_MSG] = {TEST_MSG};
+
+    if(argc != 2) {
+        printf("Error, el programa debe ejecutarse como: ./monitor <LAG>\n");
+        exit(EXIT_FAILURE);
+    }
+
+    lag = atoi(argv[1]);
 
     attributes.mq_maxmsg = 10;
     attributes.mq_msgsize = MAX_MSG;
@@ -35,15 +43,17 @@ int main(int argc, char *argv[]) {
     }
 
     for(i = 0; i < 8; i++) {
-        printf("Enviando mensaje: %s", test[i]);
+        printf("Enviando mensaje: %s\n", test[i]);
         if (mq_send(mq, test[i], strlen(test[i]) + 1, 1) == -1) {
             perror("mq_send") ;
             mq_close(mq) ;
             exit(EXIT_FAILURE) ;
         }
+
+        sleep(lag);
     }
 
     mq_close(mq);
 
-    return 0;
+    exit(EXIT_SUCCESS);
 }
