@@ -1,12 +1,12 @@
 /**
  * @file monitor.c
  * @author Luis Felice and Angela Valderrama
- * @brief 
+ * @brief
  * @version 0.1
  * @date 2023-03-31
- * 
+ *
  * @copyright Copyright (c) 2023
- * 
+ *
  */
 
 #include <stdio.h>
@@ -28,13 +28,21 @@
 #define MQ_LEN 7
 #define MQ_NAME "/queue_minero"
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
 
     int lag = 0;
     int fd_shm;
-    
-    if(argc < 2) {
+
+    if (argc < 2)
+    {
         printf("Error, el programa debe iniciarse de la siguiente manera: ./monitor <LAG>");
+        exit(EXIT_FAILURE);
+    }
+
+    if (atoi(argv[1]) < 0)
+    {
+        printf("Error, el lag debe ser mayor o igual que 0");
         exit(EXIT_FAILURE);
     }
 
@@ -43,20 +51,25 @@ int main(int argc, char *argv[]) {
 
     /* Crear segmento de memoria compartida o abrirlo si ya existe */
     fd_shm = shm_open(SHM_NAME, O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
-    if (fd_shm == -1) {
-        if (errno == EEXIST) {
+    if (fd_shm == -1)
+    {
+        if (errno == EEXIST)
+        {
             /* Si ya existe, soy el proceso Monitor y abro el segmento de memoria */
             fd_shm = shm_open(SHM_NAME, O_RDWR, 0);
-            if (fd_shm == -1) {
-                perror ("Error opening the shared memory segment\n");
+            if (fd_shm == -1)
+            {
+                perror("Error opening the shared memory segment\n");
                 exit(EXIT_FAILURE);
             }
 
             monitor(lag, fd_shm);
             exit(EXIT_SUCCESS);
-        } else {
-            perror("Error creating the shared memory segment\n ") ;
-            exit(EXIT_FAILURE) ;
+        }
+        else
+        {
+            perror("Error creating the shared memory segment\n ");
+            exit(EXIT_FAILURE);
         }
     }
 
@@ -66,7 +79,8 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-void comprobador(int lag, int fd_shm) {
+void comprobador(int lag, int fd_shm)
+{
 
     shm_struct *shm_struc = NULL;
     struct mq_attr attributes;
@@ -76,47 +90,53 @@ void comprobador(int lag, int fd_shm) {
 
     attributes.mq_maxmsg = 10;
     attributes.mq_msgsize = MAX_MSG;
-    
+
     printf("[%d] Checking blocks...\n", getpid());
-    
+
     /* Establecer tamaño del segmento de memoria compartida */
-    if (ftruncate(fd_shm , sizeof(shm_struct)) == -1) {
-        perror ("ftruncate");
-        shm_unlink ( SHM_NAME );
-        exit (EXIT_FAILURE);
+    if (ftruncate(fd_shm, sizeof(shm_struct)) == -1)
+    {
+        perror("ftruncate");
+        shm_unlink(SHM_NAME);
+        exit(EXIT_FAILURE);
     }
 
     /* Mapeo de segmento de memoria */
-    shm_struc = mmap(NULL, sizeof(shm_struct), PROT_READ | PROT_WRITE, MAP_SHARED, fd_shm, 0) ;
-    close (fd_shm);
-    if (shm_struc == MAP_FAILED) {
-        perror ("mmap") ;
+    shm_struc = mmap(NULL, sizeof(shm_struct), PROT_READ | PROT_WRITE, MAP_SHARED, fd_shm, 0);
+    close(fd_shm);
+    if (shm_struc == MAP_FAILED)
+    {
+        perror("mmap");
         shm_unlink(SHM_NAME);
-        exit (EXIT_FAILURE);
+        exit(EXIT_FAILURE);
     }
 
     /* Inicializar estructura de memoria compartida */
     init_struct(shm_struc);
 
     /* Introduce bloque en memoria compartida */
-    while(exit_loop == 0){
+    while (exit_loop == 0)
+    {
 
         /* Abrir cola de mensajes */
-        if ((mq = mq_open(MQ_NAME, O_CREAT | O_RDWR , S_IRUSR | S_IWUSR, &attributes)) == (mqd_t) -1) {
-            perror("mq_open") ;
-            exit(EXIT_FAILURE) ;
+        if ((mq = mq_open(MQ_NAME, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, &attributes)) == (mqd_t)-1)
+        {
+            perror("mq_open");
+            exit(EXIT_FAILURE);
         }
         fflush(stdout);
 
         /* Recibe el bloque por la cola de mensajes */
-        if (mq_receive(mq, recv, MAX_MSG, &prior) == -1) {
-            perror ("mq_receive");
+        if (mq_receive(mq, recv, MAX_MSG, &prior) == -1)
+        {
+            perror("mq_receive");
             mq_close(mq);
             exit(EXIT_FAILURE);
         }
 
         /* Comprueba si es el bloque de finalización */
-        if(strcmp(recv, "end") == 0) {
+        if (strcmp(recv, "end") == 0)
+        {
             exit_loop = 1;
         }
 
@@ -128,7 +148,8 @@ void comprobador(int lag, int fd_shm) {
 
         /* Escribir bloque en memoria compartida */
         shm_struc->rear++;
-        if(shm_struc->rear == BUFFER_SIZE){
+        if (shm_struc->rear == BUFFER_SIZE)
+        {
             shm_struc->rear = 0;
         }
 
@@ -137,14 +158,17 @@ void comprobador(int lag, int fd_shm) {
 
         sem_post(&shm_struc->sem_mutex);
         sem_post(&shm_struc->sem_fill);
-        
+
         /* Espera */
         usleep(lag);
-
     }
 
     /* Se desasocia el segmento de memoria compartida */
-    munmap(shm_struc, sizeof(shm_struct));
+    if (munmap(shm_struc, sizeof(shm_struct)) == -1)
+    {
+        perror("munmap");
+        exit(EXIT_FAILURE);
+    }
 
     /* Se cierra la cola de mensajes y se elimina porque somos el último proceso en usarla */
     mq_close(mq);
@@ -155,25 +179,28 @@ void comprobador(int lag, int fd_shm) {
     return;
 }
 
-void monitor(int lag, int fd_shm) {
+void monitor(int lag, int fd_shm)
+{
 
     shm_struct *shm_struc = NULL;
     int end_loop = 0, flag;
     long int target, res;
 
     printf("[%d] Printing blocks...\n", getpid());
-    
+
     /* Mapeo de segmento de memoria */
-    shm_struc = mmap(NULL, sizeof(shm_struct), PROT_READ | PROT_WRITE, MAP_SHARED, fd_shm, 0) ;
+    shm_struc = mmap(NULL, sizeof(shm_struct), PROT_READ | PROT_WRITE, MAP_SHARED, fd_shm, 0);
     close(fd_shm);
-    if (shm_struc == MAP_FAILED) {
-        perror ("mmap") ;
+    if (shm_struc == MAP_FAILED)
+    {
+        perror("mmap");
         shm_unlink(SHM_NAME);
         exit(EXIT_FAILURE);
     }
-    
+
     /* Extrae bloque de memoria compartida */
-    while(end_loop == 0){
+    while (end_loop == 0)
+    {
 
         /* Espera a que haya un bloque en el buffer */
         sem_wait(&shm_struc->sem_fill);
@@ -182,28 +209,35 @@ void monitor(int lag, int fd_shm) {
 
         /* Leer bloque de memoria compartida */
         shm_struc->front++;
-        if(shm_struc->front == BUFFER_SIZE){
+        if (shm_struc->front == BUFFER_SIZE)
+        {
             shm_struc->front = 0;
         }
 
         shm_struc->front = shm_struc->front % BUFFER_SIZE;
 
         /* Comprueba si es el bloque de finalización */
-        if(strcmp(shm_struc->buffer[shm_struc->front].msg, "end") == 0) {
+        if (strcmp(shm_struc->buffer[shm_struc->front].msg, "end") == 0)
+        {
             end_loop = 1;
-        } else {
+        }
+        else
+        {
             /* Leer objetivo y solución */
             sscanf(shm_struc->buffer[shm_struc->front].msg, "%ld-%ld", &target, &res);
-            
+
             /* Comprobar solución */
             flag = comprobar(target, res);
-            if(flag == 1) {
+            if (flag == 1)
+            {
                 printf("Solution accepted: %08ld --> %08ld\n", target, res);
-            } else {
+            }
+            else
+            {
                 printf("Solution rejected: %08ld --> %08ld\n", target, res);
             }
         }
-        
+
         sem_post(&shm_struc->sem_mutex);
         sem_post(&shm_struc->sem_empty);
 
@@ -223,12 +257,13 @@ void monitor(int lag, int fd_shm) {
     printf("[%d] Finishing\n", getpid());
 
     return;
-
 }
 
-void init_struct(shm_struct *shm_struc) {
+void init_struct(shm_struct *shm_struc)
+{
 
-    if (shm_struc == NULL) {
+    if (shm_struc == NULL)
+    {
         return;
     }
 
@@ -237,32 +272,34 @@ void init_struct(shm_struct *shm_struc) {
     shm_struc->rear = -1;
 
     /* Inicializar semáforos sin nombre a utilizar */
-    if(sem_init(&shm_struc->sem_mutex, 1, 1) == -1){
+    if (sem_init(&shm_struc->sem_mutex, 1, 1) == -1)
+    {
         perror("sem_init");
         exit(EXIT_FAILURE);
     }
 
-    if(sem_init(&shm_struc->sem_empty, 1, (BUFFER_SIZE - 1)) == -1){
+    if (sem_init(&shm_struc->sem_empty, 1, (BUFFER_SIZE - 1)) == -1)
+    {
         perror("sem_init");
         exit(EXIT_FAILURE);
     }
 
-    if(sem_init(&shm_struc->sem_fill, 1, 0) == -1){
+    if (sem_init(&shm_struc->sem_fill, 1, 0) == -1)
+    {
         perror("sem_init");
         exit(EXIT_FAILURE);
     }
-
 }
 
-
-int comprobar(int target, int res) {
+int comprobar(int target, int res)
+{
 
     int flag = 0;
 
-    if(target ==  pow_hash(res)) {
+    if (target == pow_hash(res))
+    {
         flag = 1;
     }
-    
-    return flag;
 
+    return flag;
 }
