@@ -115,15 +115,17 @@ void comprobador(int lag, int fd_shm)
     init_struct(shm_struc);
 
     /* Introduce bloque en memoria compartida */
-    while (exit_loop == 0)
-    {
+    while(exit_loop == 0){
 
-        /* Abrir cola de mensajes */
-        if ((mq = mq_open(MQ_NAME, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, &attributes)) == (mqd_t)-1)
-        {
-            perror("mq_open");
-            exit(EXIT_FAILURE);
-        }
+    /* Abrir cola de mensajes */
+    if ((mq = mq_open(MQ_NAME, O_CREAT | O_RDWR , S_IRUSR | S_IWUSR, &attributes)) == (mqd_t) -1) {
+        perror("mq_open") ;
+        exit(EXIT_FAILURE) ;
+    }
+
+    /* Introduce bloque en memoria compartida */
+    while(exit_loop == 0){
+
         fflush(stdout);
 
         /* Recibe el bloque por la cola de mensajes */
