@@ -70,4 +70,4 @@ void init_struct(shm_struct *shm_struc);
  */
 int comprobar(int target, int res);
 
-#endif // MONITOR_H
+#endif /* MONITOR_H */

@@ -13,6 +13,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <mqueue.h>
 #include "monitor.h"
@@ -62,7 +63,7 @@ int main(int argc, char *argv[])
     attributes.mq_maxmsg = MQ_LEN;
     attributes.mq_msgsize = MAX_MSG;
 
-    if ((mq = mq_open(MQ_NAME, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, &attributes)) == (mqd_t)-1)
+    if ((mq = mq_open(MQ_NAME, O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR, &attributes)) == (mqd_t)-1)
     {
         perror("mq_open");
         exit(EXIT_FAILURE);

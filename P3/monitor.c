@@ -86,9 +86,10 @@ void comprobador(int lag, int fd_shm)
     struct mq_attr attributes;
     mqd_t mq;
     char recv[MAX_MSG] = "\0";
-    int exit_loop = 0, prior;
+    int exit_loop = 0, prior, flag;
+    long int target, res;
 
-    attributes.mq_maxmsg = 10;
+    attributes.mq_maxmsg = MQ_LEN;
     attributes.mq_msgsize = MAX_MSG;
 
     printf("[%d] Checking blocks...\n", getpid());
@@ -115,7 +116,7 @@ void comprobador(int lag, int fd_shm)
     init_struct(shm_struc);
 
     /* Abrir cola de mensajes */
-    if ((mq = mq_open(MQ_NAME, O_CREAT | O_RDWR , S_IRUSR | S_IWUSR, &attributes)) == (mqd_t) -1) {
+    if ((mq = mq_open(MQ_NAME, O_CREAT | O_RDONLY , S_IRUSR | S_IWUSR, &attributes)) == (mqd_t) -1) {
         perror("mq_open") ;
         exit(EXIT_FAILURE) ;
     }
@@ -137,6 +138,18 @@ void comprobador(int lag, int fd_shm)
         if (strcmp(recv, "end") == 0)
         {
             exit_loop = 1;
+        }
+        else
+        {
+            /* Obtener el target y la solución */
+            sscanf(recv, "%ld-%ld", &target, &res);
+
+            /* Comprobar solución */
+            flag = comprobar(target, res);
+
+            /* Preparar mensaje para enviar */
+            sprintf(recv, "%ld %ld %d", target, res, flag);
+
         }
 
         /* Espera a que haya espacio en el buffer */
@@ -223,10 +236,8 @@ void monitor(int lag, int fd_shm)
         else
         {
             /* Leer objetivo y solución */
-            sscanf(shm_struc->buffer[shm_struc->front].msg, "%ld-%ld", &target, &res);
+            sscanf(shm_struc->buffer[shm_struc->front].msg, "%ld %ld %d", &target, &res, &flag);
 
-            /* Comprobar solución */
-            flag = comprobar(target, res);
             if (flag == 1)
             {
                 printf("Solution accepted: %08ld --> %08ld\n", target, res);
@@ -250,7 +261,11 @@ void monitor(int lag, int fd_shm)
     sem_destroy(&shm_struc->sem_fill);
 
     /* Se desasocia el segmento de memoria compartida */
-    munmap(shm_struc, sizeof(shm_struct));
+    if(munmap(shm_struc, sizeof(shm_struct)) == -1)
+    {
+        perror("munmap");
+        exit(EXIT_FAILURE);
+    }
     shm_unlink(SHM_NAME);
 
     printf("[%d] Finishing\n", getpid());
