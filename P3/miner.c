@@ -90,7 +90,7 @@ int main(int argc, char *argv[])
         }
 
         /* Esperar el tiempo de lag */
-        usleep(lag);
+        usleep(lag*1000);
 
         /* Obtener el nuevo target */
         target = res;

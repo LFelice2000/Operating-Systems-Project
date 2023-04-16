@@ -172,7 +172,7 @@ void comprobador(int lag, int fd_shm)
         sem_post(&shm_struc->sem_fill);
 
         /* Espera */
-        usleep(lag);
+        usleep(lag*1000);
     }
 
     /* Se desasocia el segmento de memoria compartida */
@@ -252,7 +252,7 @@ void monitor(int lag, int fd_shm)
         sem_post(&shm_struc->sem_empty);
 
         /* Espera */
-        usleep(lag);
+        usleep(lag*1000);
     }
 
     /* Se destruyen los semáforos sin nombre porque somos el último proceso en usarlos */
