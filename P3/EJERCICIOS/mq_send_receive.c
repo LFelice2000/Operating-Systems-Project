@@ -1,3 +1,25 @@
+/**
+ * @file mq_send_receive.c
+ * @author your name (you@domain.com)
+ * @brief 
+ * @version 0.1
+ * @date 2023-04-16
+ * 
+ * @copyright Copyright (c) 2023
+ * 
+ * a) ¿En que orden se envıan los mensajes y en que orden se reciben? ¿Por que?
+ * 
+ * Los mensajes se envían en el orden en el que se escriben en el código. Los mensajes se reciben según su prioridad.
+ * A mayor número de prioridad, mayor es la prioridad del mensaje. Por ejemplo, el mensaje con prioridad 3 se recibe
+ * antes que el mensaje con prioridad 1. * 
+ * 
+ * b) ¿Que sucede si se cambia O_RDWR por O_RDONLY? ¿Y si se cambia por O_WRONLY?
+ * 
+ * Si se cambia O_RDWR por O_RDONLY, el programa no puede enviar mensajes. Si se cambia por O_WRONLY, el programa no
+ * puede recibir mensajes.
+ * 
+ */
+
 #include <mqueue.h>
 #include <stdio.h>
 #include <stdlib.h>

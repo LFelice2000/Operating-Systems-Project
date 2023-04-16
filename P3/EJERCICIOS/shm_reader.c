@@ -1,3 +1,35 @@
+/**
+ * @file shm_reader.c
+ * @author your name (you@domain.com)
+ * @brief 
+ * @version 0.1
+ * @date 2023-04-16
+ * 
+ * @copyright Copyright (c) 2023
+ * 
+ * a) ¿Tendr ́ıa sentido incluir shm_unlink en el lector? ¿Por qu ́e?
+ * 
+ * No tendría sentido incluir shm_unlink en el lector, ya que el lector no crea el segmento de memoria compartida, sino que lo abre y lo lee.
+ * 
+ * b) ¿Tendrıa sentido incluir ftruncate en el lector? ¿Por que?
+ * 
+ * No tendría sentido incluir ftruncate en el lector, ya que el lector no crea el segmento de memoria compartida, sino que lo abre y lo lee.
+ * 
+ * c) ¿Cual es la diferencia entre shm_open y mmap? ¿Qu ́e sentido tiene que existan dos
+ * funciones diferentes?
+ * 
+ * La diferencia entre shm_open y mmap es que shm_open crea un segmento de memoria compartida y mmap lo mapea en memoria. Tienen sentido dos funciones diferentes porque
+ * es necesario distinguir entre la creación del segmento de memoria compartida y el mapeo de la memoria compartida en memoria.
+ * 
+ * d) ¿Se podrıa haber usado la memoria compartida sin enlazarla con mmap? Si es ası,
+ * ¿como se harıa?
+ * 
+ * No se podría haber usado la memoria compartida sin enlazarla con mmap, ya que mmap es la única forma de mapear la memoria compartida en memoria. Si no se mapea la memoria
+ * compartida en memoria, no se puede acceder a ella. Aun así, se podría haber usado la memoria compartida sin enlazarla con mmap, pero habría que usar funciones como
+ * shmget, shmat, shmdt, etc.
+ * 
+ */
+
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>

@@ -1,3 +1,27 @@
+/**
+ * @file file_mmap.c
+ * @author your name (you@domain.com)
+ * @brief 
+ * @version 0.1
+ * @date 2023-04-16
+ * 
+ * @copyright Copyright (c) 2023
+ * 
+ * a) ¿Que sucede cuando se ejecuta varias veces el programa anterior? ¿Por que?
+ * 
+ * El contador se incrementa en 1 cada vez que se ejecuta el programa. Esto se debe a que
+ * el fichero se mapea en memoria y se incrementa el valor de la variable apuntada por el
+ * puntero.
+ * 
+ * b) ¿Se puede leer el contenido del fichero ((test_file.dat)) con un editor de texto? ¿Por
+ * que?
+ * 
+ * No se puede leer el contenido del fichero con un editor de texto porque el fichero está
+ * mapeado en memoria y no se puede acceder a él. La única forma de leer el contenido del
+ * fichero es ejecutando el programa.
+ * 
+ */
+
 /* READER */
 #include <errno.h>
 #include <fcntl.h>
