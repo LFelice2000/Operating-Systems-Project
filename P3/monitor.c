@@ -36,13 +36,13 @@ int main(int argc, char *argv[])
 
     if (argc < 2)
     {
-        printf("Error, el programa debe iniciarse de la siguiente manera: ./monitor <LAG>");
+        printf("Error, el programa debe iniciarse de la siguiente manera: ./monitor <LAG>\n");
         exit(EXIT_FAILURE);
     }
 
     if (atoi(argv[1]) < 0)
     {
-        printf("Error, el lag debe ser mayor o igual que 0");
+        printf("Error, el lag debe ser mayor o igual que 0\n");
         exit(EXIT_FAILURE);
     }
 
