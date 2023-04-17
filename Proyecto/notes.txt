@@ -1,0 +1,57 @@
+Dos programas:
+
+MINERO
+
+- cada minero tiene dos procesos: proceso Padre y proceso Registrador
+- proceos Minero crea los hilos que buscan la solución de POW
+- el proceos Registrador, almacena las soluciones en un fichero
+- los mineros se lanzan en diferentes terminales
+- el primer minero, prepara la estructura de datos para almacenar las soluciones
+- si un minero entra en el sistema, habrá que registrarle en la estructura de datos
+- si un minero sale del sistema, habrá que eliminarlo de la estructura de datos
+
+MONITOR
+- el monitor tendrá dos procesos: proceso Comprobador y proceso Monitor
+- el Monitor puede arrancar en cualquier momento
+- el Monitor se encarga de mostrar por pantalla como va la búsqueda de soluciones
+- el Monitor puede cerrarse en cualquier momento y si se abre de nuevo, se mostrará el estado actual de la búsqueda de soluciones
+
+
+BLOQUE
+- contiene el id del Bloque (incremental)
+- target: objetivo
+- solución del objetivo
+- PID del minero ganador
+- carteras de los mineros que han participado en la búsqueda de la solución
+ (cuando un mineor llega a la solución, se envía la solución a todos los demás mineros, se vota; si la votación es positiva, el minero
+ganador, gana una moneda y se inserta en su cartera)
+- el número de votos totales para evaluar la solución
+
+SEGMENTO DE MEMORIA COMPARTIDA
+- listado de PIDS de los mineros activos
+- listado de votos de cada minero
+- listado con las monedas obtenidas por cada minero
+- último bloque resuelto y bloque actual que se está resolviendo
+
+PROCESO MINERO:
+- dos variables: segundos de ejecución y número de hilos
+- el Registrador, registra lso bloques en un fichero
+- primer minero crea o abre la memoria compartida y la estructura de datos
+- MAXIMO 100 mineros
+
+MINADO
+- solo puede haber un GANADOR (sem parecido al del Candidato)
+
+VOTACIÓN
+- 100 intentos para verficar que todos los procesos han votado
+(lo que garantiza que el sistema
+no se bloquee si termina de forma abrupta alg ́un minero antes de votar)
+
+ENVÍO BLOQUE
+- proceso Ganador solo se envía si hay un monitor esperando (semaforo con nombre)
+
+
+proceso comprobador puede recibir SIGINT, entonces tiene que mandar el bloque finalizacion
+al proceso monitor
+
+
