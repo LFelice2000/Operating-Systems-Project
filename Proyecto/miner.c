@@ -12,6 +12,7 @@
 #include <signal.h>
 #include <errno.h>
 #include "miner.h"
+#include "pow.h"
 
 #define SEM_NAME "/sem_minero"
 #define SHM_NAME "/shm_minero"
@@ -20,6 +21,8 @@ int solucion = 0;
 int target = 0;
 
 int got_SIGUSR1 = 0;
+int got_SIGUSR2 = 0;
+
 sem_t *sem_minero;
 
 sigset_t set, oldset;
@@ -28,6 +31,8 @@ struct sigaction act;
 void handler(int sig){
     if(sig == SIGUSR1){
         got_SIGUSR1 = 1;
+    }else if(sig == SIGUSR2){
+        got_SIGUSR2 = 1;
     }
 }
 
@@ -64,6 +69,7 @@ int main(int argc, char *argv[]){
     /* Bloqueo de las señales */
     sigemptyset(&set);
     sigaddset(&set, SIGUSR1);
+    sigaddset(&set, SIGUSR2);
 
     sigprocmask(SIG_BLOCK, &set, &oldset);
 
@@ -91,8 +97,14 @@ int main(int argc, char *argv[]){
 void minero(int n_threads){
     
     Sistema *sistema;
-    int fd_shm, value, i;
+    Minero *minero;
+    int fd_shm, value, i, j;
     struct stat statshm;
+
+    if((minero = minero_init(n_threads)) == NULL){
+        printf("[ERROR] No se ha podido inicializar la estructura Minero\n");
+        exit(EXIT_FAILURE);
+    }
 
     /* Creación o apertura del semáforo de los mineros */
     sem_minero = sem_open(SEM_NAME, O_CREAT, S_IRUSR | S_IWUSR, 1);
@@ -167,8 +179,6 @@ void minero(int n_threads){
         }
         sem_post(&sistema->mutex);
 
-        minado(n_threads, sistema);
-
     }else{
             
         /* No soy el primer minero */
@@ -219,13 +229,121 @@ void minero(int n_threads){
             sigsuspend(&oldset);
         }
 
-        minado(n_threads, sistema);
+    }
+
+    /* Bucle principal */
+
+    /* Minado hasta que sea el primero en encontrar la solución */
+    while(got_SIGUSR2 == 0){
+        solution = minado(n_threads, sistema, minero);
+    }
+
+    /* Intento de proclamación de ganador */
+    if(sem_trywait(&sistema->winner) == 0){
+
+        /* Soy el ganador */
+
+        /* Actualización del bloque */
+        sem_wait(&sistema->mutex);
+
+        sistema->current.solution = solution;
+        sistema->winner = getpid();
+        /* Inicialización de los votos a -1 */
+        for(i = 0; i < MAX_MINEROS; i++){
+            sistema->votes[i] = -1;
+        }
+
+        sem_post(&sistema->mutex);
+
+        /* Envío señal SIGUSR2 a los demás mineros */
+        sem_wait(&sistema->mutex);
+        for(i = 0; i < MAX_MINEROS; i++){
+            if(sistema->pids[i] != -1 && sistema->pids[i] != getpid()){
+                kill(sistema->pids[i], SIGUSR2);
+            }
+        }
+        sem_post(&sistema->mutex);
+
+        /* Comprobar que todos los demás procesos han votado */
+        j = 0;
+        while(j < MAX_MINEROS){
+            sem_wait(&sistema->mutex);
+            for(i = 0; i < MAX_MINEROS; i++){
+                if(sistema->votes[i] != -1){
+                    count++;
+                }
+            }
+
+            if(count == sistema->n_mineros - 1){
+                sem_post(&sistema->mutex);
+                count = 0;
+                break;
+            }
+
+            count = 0;
+
+            sem_post(&sistema->mutex);
+            if(i == MAX_MINEROS){
+                break;
+            }
+
+            usleep(500);
+            j++;
+        }
+
+        /* Recuento de votos */
+        sem_wait(&sistema->mutex);
+        for(i = 0; i < MAX_MINEROS; i++){
+            if(sistema->votes[i] == 1){
+                yes++;
+            }else if(sistema->votes[i] == 0){
+                no++;
+            }
+        }
+
+        /* Si se recibe la aprobación, actualizar Bloque */
+        if(yes > no){
+            sistema->current.votes = yes + no;
+            sistema->current.positives = yes;
+        }
     
+    }else{
+            
+        /* No soy el ganador */
+
+        /* Esperar a recibir la señal SIGUSR2 */
+        while(got_SIGUSR2 == 0){
+            sigsuspend(&oldset);
+        }
+
+        /* LIMPIAR RECURSOS */
+        exit(EXIT_SUCCESS);
+
     }
 
 }
 
 void registrador(){
+
+}
+
+Minero *minero_init(int n_threads){
+
+    Minero *minero;
+
+    minero = (Minero *)malloc(sizeof(Minero));
+    if(minero == NULL){
+        perror("[ERROR] No se ha podido reservar memoria para el minero\n");
+        exit(EXIT_FAILURE);
+    }
+
+    minero->threads = (pthread_t *)malloc(n_threads * sizeof(pthread_t));
+    if(minero->threads == NULL){
+        perror("[ERROR] No se ha podido reservar memoria para los hilos del minero\n");
+        exit(EXIT_FAILURE);
+    }
+
+    return minero;
 
 }
 
@@ -281,18 +399,11 @@ void bloque_init(Bloque *bloque){
 
 }
 
-int minado(int n_threads, Sistema *sistema){
+int minado(int n_threads, Sistema *sistema, Minero *minero){
 
     pthread_t *hilos = NULL;
     Info *thInfo = NULL;
     int i, err, init, end;
-    
-    /* Se crea un array para guardar los hilos */
-    hilos = (pthread_t *)malloc(n_threads*sizeof(pthread_t));
-    if(hilos == NULL) {
-        fprintf(stderr, "Error: no se ha podido reservar memoria para los hilos.\n");
-        return;
-    }
 
     /* Se crea un array para guardar la información de los hilos */
     thInfo = (Info*)malloc(n_threads*sizeof(Info));
@@ -322,7 +433,7 @@ int minado(int n_threads, Sistema *sistema){
         }
 
         /* Se crea el hilo */
-        err = pthread_create(&hilos[i], NULL, prueba_de_fuerza, (void *)&thInfo[i]);
+        err = pthread_create(&minero->threads[i], NULL, prueba_de_fuerza, (void *)&thInfo[i]);
         if(err != 0) {
             fprintf(stderr, "pthread_create : %s\n", strerror(err));
             free(hilos);
@@ -334,16 +445,17 @@ int minado(int n_threads, Sistema *sistema){
     /* Se espera a que terminen los hilos*/
     for(i = 0; i < n_threads; i++) {
 
-        err = pthread_join(hilos[i], NULL);
+        err = pthread_join(minero->threads[i], NULL);
         if(err != 0) {
             fprintf(stderr, "pthread_join : %s\n", strerror(err));
             free(hilos);
             return;
         }
+
     }
 
     /* Se libera la memoria */
-    free(hilos);
+    free(minero->threads);
     free(thInfo);
 
     return target;
@@ -357,7 +469,7 @@ void *prueba_de_fuerza(void *info) {
 
     /* Se prueba la fuerza bruta */
     i = thInfo->lower;
-    while(solucion == 0){
+    while(got_SIGUSR2 == 0 || solucion == 0){
 
         /* Se comprueba que el número no se salga del rango */
         if(i > thInfo->upper) {
@@ -373,6 +485,7 @@ void *prueba_de_fuerza(void *info) {
             /* Se guarda la solucion en la variable global target y 
                 se cambia la flag para que los demás hilos dejen de minar */
             solucion = 1;
+            got_SIGUSR2 = 1;
             target = i;
 
             return NULL;

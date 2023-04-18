@@ -33,9 +33,12 @@ typedef struct Info {
 
     int lower;
     int upper;
-    Sistema *sistema;
 
 } Info;
+
+typedef struct Minero {
+    pthread_t *threads;
+} Minero;
 
 void minero(int n_threads);
 
@@ -44,5 +47,11 @@ void registrador();
 void sistema_init(Sistema *sistema);
 
 void bloque_init(Bloque *bloque);
+
+Minero *minero_init(int n_threads);
+
+int minado(int n_threads, Sistema *sistema, Minero *minero);
+
+void *prueba_de_fuerza(void *info);
 
 #endif /* MINER_H */
