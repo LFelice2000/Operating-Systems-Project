@@ -55,3 +55,10 @@ proceso comprobador puede recibir SIGINT, entonces tiene que mandar el bloque fi
 al proceso monitor
 
 
+
+/*** DUDAS ***/
+
+- por qué el sistema tiene que guardar el listado de monedas de cada minero?
+- qué hace Registrador? todos los mineros, le envían su propio bloque (sea correcto o no) o le envían el bloque ganador o sólo el minero ganador?
+- cuando un hilo encuentra la solución, los demás hilos acaban y además los hilos de los demás mineros también acaban?
+- qué les hace salir del minado a los otro mineros? SIGUSR2? pero luego, vuelven a esperar a SIGUSR2 para votar, entonces?

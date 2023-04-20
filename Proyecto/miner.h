@@ -23,6 +23,7 @@ typedef struct Sistema{
     int votes[MAX_MINEROS];
     int coins[MAX_MINEROS];
     int n_mineros;
+    int n_bloques;
     Bloque last;
     Bloque current; 
     sem_t winner;
@@ -30,28 +31,29 @@ typedef struct Sistema{
 } Sistema;
 
 typedef struct Info {
-
     int lower;
     int upper;
-
 } Info;
 
 typedef struct Minero {
     pthread_t *threads;
+    Bloque *bloque;
 } Minero;
 
-void minero(int n_threads);
+void minero_main(int n_threads);
 
 void registrador();
 
 void sistema_init(Sistema *sistema);
 
-void bloque_init(Bloque *bloque);
+void bloque_init(Bloque *bloque, Sistema *sistema, int target);
 
 Minero *minero_init(int n_threads);
 
 int minado(int n_threads, Sistema *sistema, Minero *minero);
 
 void *prueba_de_fuerza(void *info);
+
+void clear();
 
 #endif /* MINER_H */
