@@ -62,3 +62,12 @@ al proceso monitor
 - qué hace Registrador? todos los mineros, le envían su propio bloque (sea correcto o no) o le envían el bloque ganador o sólo el minero ganador?
 - cuando un hilo encuentra la solución, los demás hilos acaban y además los hilos de los demás mineros también acaban?
 - qué les hace salir del minado a los otro mineros? SIGUSR2? pero luego, vuelven a esperar a SIGUSR2 para votar, entonces?
+
+
+- cada minero envía el bloque ganador a su padre Registrador
+- el registrador luego lo escribe en un fichero
+- para votar, hace rpow_hash otra vez
+- el sistema guarda el array de carteras
+- dos SIGUSR2
+- 
+

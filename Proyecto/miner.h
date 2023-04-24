@@ -21,7 +21,7 @@ typedef struct Bloque{
 typedef struct Sistema{
     pid_t pids[MAX_MINEROS];
     int votes[MAX_MINEROS];
-    int coins[MAX_MINEROS];
+    Wallet coins[MAX_MINEROS];
     int n_mineros;
     int n_bloques;
     Bloque last;
@@ -40,7 +40,7 @@ typedef struct Minero {
     Bloque *bloque;
 } Minero;
 
-void minero_main(int n_threads);
+void minero_main(int n_threads, int n_seconds);
 
 void registrador();
 

@@ -1,6 +1,6 @@
-EXE = miner monitor
+EXE = miner
 FLAGS = -g -pedantic -Wall -pedantic
-LIBS = -lpthread -lrt
+LIBS = -lpthread -lrt -lm
 
 all: $(EXE)
 
