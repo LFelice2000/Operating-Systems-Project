@@ -21,7 +21,7 @@ typedef struct Bloque{
 typedef struct Sistema{
     pid_t pids[MAX_MINEROS];
     int votes[MAX_MINEROS];
-    Wallet coins[MAX_MINEROS];
+    Wallet wallets[MAX_MINEROS];
     int n_mineros;
     int n_bloques;
     Bloque last;
@@ -48,9 +48,9 @@ void sistema_init(Sistema *sistema);
 
 void bloque_init(Bloque *bloque, Sistema *sistema, int target);
 
-Minero *minero_init(int n_threads);
+Bloque *bloque_copy(Bloque *src);
 
-int minado(int n_threads, Sistema *sistema, Minero *minero);
+int minado(int n_threads, Sistema *sistema);
 
 void *prueba_de_fuerza(void *info);
 

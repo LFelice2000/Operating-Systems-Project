@@ -17,4 +17,4 @@ monitor: monitor.o pow.o
 	gcc $(FLAGS) -o monitor monitor.o pow.o $(LIBS)
 
 clean:
-	rm -f *.o $(EXE)
+	rm -f *.o $(EXE) *.txt
