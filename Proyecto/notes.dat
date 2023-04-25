@@ -69,5 +69,14 @@ al proceso monitor
 - para votar, hace rpow_hash otra vez
 - el sistema guarda el array de carteras
 - dos SIGUSR2
-- 
+
+/*** RESUELTO ***/
+
+
+NUEVA DUDA:
+- Hace esperas no activas cortas hasta que todos los procesos introduzcan su voto, o
+hasta que transcurra un n ́umero m ́aximo de intentos (lo que garantiza que el sistema
+no se bloquee si termina de forma abrupta alg ́un minero antes de votar).
+
+se hacen las dos o sólo una de las 2? 
 

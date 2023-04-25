@@ -18,6 +18,7 @@
 #include "pow.h"
 
 #define SEM_NAME "/sem_minero"
+#define SEM_WINNER "/sem_winner"
 #define SHM_NAME "/shm_sistema"
 
 int found = 0;
@@ -30,6 +31,7 @@ int got_SIGUSR1 = 0;
 int got_SIGUSR2 = 0;
 
 sem_t *sem_minero;
+sem_t *sem_winner;
 
 Sistema *sistema = NULL;
 Minero *minero = NULL;
@@ -155,6 +157,13 @@ void minero_main(int n_threads, int n_seconds){
         exit(EXIT_FAILURE);
     }
 
+    /* Creación o apertura del semáforo del ganador */
+    sem_winner = sem_open(SEM_WINNER, O_CREAT, S_IRUSR | S_IWUSR, 1);
+    if(sem_winner == SEM_FAILED){
+        printf("[ERROR] No se ha podido crear el semáforo\n");
+        exit(EXIT_FAILURE);
+    }
+
     /* Identificar el primer minero que llega */
     if(sem_trywait(sem_minero) == 0){
 
@@ -206,8 +215,6 @@ void minero_main(int n_threads, int n_seconds){
             }
         }
         sistema->n_mineros++;
-
-
         
         sem_post(&sistema->mutex);
 
@@ -245,10 +252,8 @@ void minero_main(int n_threads, int n_seconds){
 
         /* Comprobar el tamaño del segmento o el último semáforo */
         fstat(fd_shm, &statshm);
-        sem_getvalue(&sistema->winner, &value);
-        while(statshm.st_size != sizeof(Sistema) && value != 0){
+        while(statshm.st_size != sizeof(Sistema)){
             fstat(fd_shm, &statshm);
-            sem_getvalue(&sistema->winner, &value);
         }
 
         /* Registro del minero con su PID en el sistema */
@@ -282,6 +287,15 @@ void minero_main(int n_threads, int n_seconds){
 
     }
 
+    sem_wait(&sistema->mutex);
+    printf("[%d]: Número de mineros: %d\n", getpid(), sistema->n_mineros);
+    for(i = 0; i < MAX_MINEROS; i++){
+        if(sistema->pids[i] != -1){
+            printf("[%d]: Minero registrado en la posición %d: %d\n", getpid(), i, sistema->pids[i]);
+        }
+    }
+    sem_post(&sistema->mutex);
+
     /* Bucle principal */
     while(got_SIGUSR1 == 1){
 
@@ -293,7 +307,9 @@ void minero_main(int n_threads, int n_seconds){
         printf("[%d]: %08d-%08d\n", getpid(), sistema->current.target, solution);
 
         /* Intento de proclamación de ganador */
-        if(sem_trywait(&sistema->winner) == 0){
+        if(sem_trywait(sem_winner) == 0){
+
+            printf("----------- ENTRO %d -----------\n", getpid());
 
             /* Soy el ganador */
 
@@ -326,6 +342,7 @@ void minero_main(int n_threads, int n_seconds){
                 sem_wait(&sistema->mutex);
                 for(i = 0; i < MAX_MINEROS; i++){
                     if(sistema->votes[i] != -1){
+                        printf("[%d]: Voto recibido de %d\n", getpid(), sistema->votes[i]);
                         count++;
                     }
                 }
@@ -340,11 +357,8 @@ void minero_main(int n_threads, int n_seconds){
                 count = 0;
 
                 sem_post(&sistema->mutex);
-                if(i == MAX_MINEROS){
-                    break;
-                }
-
-                usleep(500);
+                
+                usleep(5000);
                 j++;
             }
 
@@ -382,6 +396,14 @@ void minero_main(int n_threads, int n_seconds){
 
             }
 
+            /* Reset el contador de votos */
+            for(i = 0; i < MAX_MINEROS; i++){
+                sistema->votes[i] = -1;
+            }
+
+            yes = 0;
+            no = 0;
+
             sem_post(&sistema->mutex);
 
             /* Enviar bloque resulto a Monitor mediante cola de mensajes */
@@ -394,7 +416,7 @@ void minero_main(int n_threads, int n_seconds){
             sem_post(&sistema->mutex);
 
             /* Liberar el semáforo winner */
-            sem_post(&sistema->winner);
+            sem_post(sem_winner);
 
             /* Enviar señal SIGUSR1 a los demás mineros */
             sem_wait(&sistema->mutex);
@@ -406,10 +428,6 @@ void minero_main(int n_threads, int n_seconds){
             sem_post(&sistema->mutex);
 
             got_SIGUSR1 = 1;
-
-            printf("[W]: last bloque:\n");
-            print_bloque(sistema->last);
-            printf("\n\n");
 
             /* Enviar último bloque resuelto al Registrador */
             if(write(fd[1], &sistema->last, sizeof(Bloque)) == -1){
@@ -433,11 +451,24 @@ void minero_main(int n_threads, int n_seconds){
             sem_wait(&sistema->mutex);
 
             /* Votar a favor */
-            for(i = 0; i < MAX_MINEROS; i++){
-                if(sistema->votes[i] == -1){
-                    sistema->votes[i] = 1;
-                    break;
+            if(pow_hash(sistema->current.solution) == sistema->current.target){
+
+                for(i = 0; i < MAX_MINEROS; i++){
+                    if(sistema->votes[i] == -1){
+                        sistema->votes[i] = 1;
+                        break;
+                    }
                 }
+
+            }else{
+
+                for(i = 0; i < MAX_MINEROS; i++){
+                    if(sistema->votes[i] == -1){
+                        sistema->votes[i] = 0;
+                        break;
+                    }
+                }
+
             }
 
             sem_post(&sistema->mutex);
@@ -445,14 +476,6 @@ void minero_main(int n_threads, int n_seconds){
             while(got_SIGUSR1 == 0){
                 sigsuspend(&oldset);
             }
-
-            printf("[L]: last bloque:\n");
-            print_bloque(sistema->last);
-            printf("\n\n");
-
-            printf("[L]: current bloque:\n");
-            print_bloque(sistema->current);
-            printf("\n\n");
 
             /* Enviar último bloque resuelto al Registrador */
             if(write(fd[1], &sistema->last, sizeof(Bloque)) == -1){
@@ -566,11 +589,7 @@ void sistema_init(Sistema *sistema){
         sistema->wallets[i].coins = 0;
     }
 
-    /* Inicialización de los semáforos */    
-    if(sem_init(&(sistema->winner), 1, 1) == -1){
-        perror("[ERROR] No se ha podido inicializar el semáforo winner\n");
-        exit(EXIT_FAILURE);
-    }
+    /* Inicialización de los semáforos */
 
     if(sem_init(&(sistema->mutex), 1, 1) == -1){
         perror("[ERROR] No se ha podido inicializar el semáforo mutex\n");
@@ -738,7 +757,6 @@ void clear(){
     for(int i = 0; i < MAX_MINEROS; i++){
         if(sistema->pids[i] == getpid()){
             sistema->pids[i] = -1;
-            sistema->votes[i] = -1;
             break;
         }
     }
@@ -763,7 +781,6 @@ void clear(){
         sem_post(&sistema->mutex);
 
         /* Destruir los semáforos */
-        sem_destroy(&sistema->winner);
         sem_destroy(&sistema->mutex);
 
         /* Unmap de la memoria compartida */
@@ -778,11 +795,18 @@ void clear(){
         /* Eliminar el semáforo de los mineros */
         sem_unlink(SEM_NAME);
 
+        /* Eliminar el semáforo del ganador */
+        sem_unlink(SEM_WINNER);
+
         /* Cerrar pipe con el proceso Registrador */
         close(fd[1]);
     }
 
     sem_close(sem_minero);
+    sem_close(sem_winner);
+
+    /* Cerrar pipe con el proceso Registrador */
+    close(fd[0]);
 
 }
 
