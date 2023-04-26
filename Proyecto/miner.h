@@ -26,7 +26,6 @@ typedef struct Sistema{
     int n_bloques;
     Bloque last;
     Bloque current; 
-    sem_t winner;
     sem_t mutex;
 } Sistema;
 

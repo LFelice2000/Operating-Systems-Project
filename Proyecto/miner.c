@@ -87,7 +87,7 @@ int main(int argc, char *argv[]){
     /* Creación del proceso Registrador*/
     pid = fork();
     if(pid == 0){
-        registrador();
+        registrador(fd);
     }else if(pid > 0){
         minero_main(n_threads, n_seconds);
     }else{
@@ -301,10 +301,16 @@ void minero_main(int n_threads, int n_seconds){
 
         got_SIGUSR1 = 0;
 
+        /* Desbloquear SIGUSR2 para que pueda ser recibida */
+        sigprocmask(SIG_UNBLOCK, &set, &oldset);
+
         /* Minado hasta que sea el primero en encontrar la solución */
         solution = minado(n_threads, sistema);
 
         printf("[%d]: %08d-%08d\n", getpid(), sistema->current.target, solution);
+
+        /* Bloquear la máscara de señales */
+        sigprocmask(SIG_BLOCK, &set, &oldset);
 
         /* Intento de proclamación de ganador */
         if(sem_trywait(sem_winner) == 0){
@@ -342,13 +348,11 @@ void minero_main(int n_threads, int n_seconds){
                 sem_wait(&sistema->mutex);
                 for(i = 0; i < MAX_MINEROS; i++){
                     if(sistema->votes[i] != -1){
-                        printf("[%d]: Voto recibido de %d\n", getpid(), sistema->votes[i]);
                         count++;
                     }
                 }
 
                 if(count == sistema->n_mineros - 1){
-                    printf("[%d]: %d han votado, la cuenta es %d\n", getpid(), sistema->n_mineros, count);
                     count = 0;
                     sem_post(&sistema->mutex);
                     break;
@@ -415,26 +419,34 @@ void minero_main(int n_threads, int n_seconds){
             bloque_init(&sistema->current, sistema, target);
             sem_post(&sistema->mutex);
 
-            /* Liberar el semáforo winner */
-            sem_post(sem_winner);
-
-            /* Enviar señal SIGUSR1 a los demás mineros */
             sem_wait(&sistema->mutex);
-            for(i = 0; i < MAX_MINEROS; i++){
-                if(sistema->pids[i] != -1 && sistema->pids[i] != getpid()){
-                    kill(sistema->pids[i], SIGUSR1);
-                }
-            }
-            sem_post(&sistema->mutex);
-
-            got_SIGUSR1 = 1;
-
             /* Enviar último bloque resuelto al Registrador */
             if(write(fd[1], &sistema->last, sizeof(Bloque)) == -1){
                 perror("write");
                 exit(EXIT_FAILURE);
             }
+            printf("[%d]: Enviado bloque al registrador\n", getpid());
+            sem_post(&sistema->mutex);
 
+            printf("[%d]: SOY GANADOR: Pŕoximo bloque:\n", getpid());
+            print_bloque(sistema->current);
+            printf("\n");
+
+            /* Enviar señal SIGUSR1 a los demás mineros */
+            sem_wait(&sistema->mutex);
+
+            for(i = 0; i < MAX_MINEROS; i++){
+                if(sistema->pids[i] != -1 && sistema->pids[i] != getpid()){
+                    kill(sistema->pids[i], SIGUSR1);
+                }
+            }
+
+            /* Liberar el semáforo winner */
+            sem_post(sem_winner);
+
+            sem_post(&sistema->mutex);
+
+            got_SIGUSR1 = 1;
 
         }else{
 
@@ -473,14 +485,17 @@ void minero_main(int n_threads, int n_seconds){
 
             sem_post(&sistema->mutex);
 
-            while(got_SIGUSR1 == 0){
-                sigsuspend(&oldset);
-            }
-
+            sem_wait(&sistema->mutex);
             /* Enviar último bloque resuelto al Registrador */
             if(write(fd[1], &sistema->last, sizeof(Bloque)) == -1){
                 perror("write");
                 exit(EXIT_FAILURE);
+            }
+            printf("[%d]: Enviado bloque al registrador\n", getpid());
+            sem_post(&sistema->mutex);
+
+            while(got_SIGUSR1 == 0){
+                sigsuspend(&oldset);
             }
 
         }
@@ -491,14 +506,14 @@ void minero_main(int n_threads, int n_seconds){
 
 void print_bloque(Bloque b){
 
-    printf("[INFO] Id:\t%d\n", b.id);
-    printf("[INFO] Winner:\t%d\n", b.winner);
-    printf("[INFO] Target:\t%d\n", b.target);
-    printf("[INFO] Solution:\t%d\n", b.solution);
+    printf("[INFO] Id:\t\t\t%04d\n", b.id);
+    printf("[INFO] Winner:\t\t%d\n", b.winner);
+    printf("[INFO] Target:\t\t%08d\n", b.target);
+    printf("[INFO] Solution:\t%08d\n", b.solution);
 
 }
 
-void registrador(){
+void registrador(int fd_in[2]){
 
     FILE *pf = NULL;
     ssize_t nbytes;
@@ -508,7 +523,7 @@ void registrador(){
     int i, file = 0;
 
     /* Cierre del extremo de escritura del pipe */
-    close(fd[1]);
+    close(fd_in[1]);
 
     /* Creación del archivo de registro */
     sprintf(filename, "%d.txt", getppid());
@@ -519,11 +534,11 @@ void registrador(){
         exit(EXIT_FAILURE);
     }
 
-    printf("[INFO] Registrador creado\n");
+    printf("[%d] Registrador creado para %d\n", getpid(), getppid());
     
     do{
 
-        nbytes = read(fd[0], &bloque, sizeof(Bloque));
+        nbytes = read(fd_in[0], &bloque, sizeof(Bloque));
         if(nbytes == -1){
             perror("[ERROR] No se ha podido leer el bloque del pipe\n");
             exit(EXIT_FAILURE);
@@ -531,9 +546,11 @@ void registrador(){
 
         if(nbytes > 0){
 
-            printf("[R] Bloque recibido\n");
+            printf("[%d] Bloque recibido\n", getpid());
             print_bloque(bloque);
-            printf("[R] Bloque resgistrado\n\n");
+            printf("[%d] Bloque resgistrado\n\n", getpid());
+
+            printf("[R] Registrador %d escribiendo en %s\n", getpid(), filename);
 
             dprintf(file, "Id:\t\t\t%04d\n", bloque.id);
             dprintf(file, "Winner:\t\t%d\n", bloque.winner);
@@ -557,7 +574,7 @@ void registrador(){
     } while(nbytes != 0);
 
     close(file);
-    close(fd[0]);
+    close(fd_in[0]);
 
     exit(EXIT_SUCCESS);
 
@@ -743,6 +760,7 @@ void *prueba_de_fuerza(void *info) {
         }
 
         i++;
+
     }
     
     return NULL;
