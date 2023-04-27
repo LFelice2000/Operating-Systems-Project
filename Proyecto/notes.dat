@@ -80,3 +80,14 @@ no se bloquee si termina de forma abrupta alg ́un minero antes de votar).
 
 se hacen las dos o sólo una de las 2? 
 
+
+- se hacen las 2
+
+
+
+/***** NUEVO *****/
+- Una vez se ha lanzado el primer minero, cualquier otro minero lanzado se une a la red de
+mineros.
+
+
+

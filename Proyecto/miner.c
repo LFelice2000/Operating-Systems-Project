@@ -140,9 +140,8 @@ void señales(int n_seconds){
 
 void minero_main(int n_threads, int n_seconds){
     
-    int fd_shm, value, i, j, count = 0, yes = 0, no = 0;
+    int fd_shm, i, j, count = 0, yes = 0, no = 0, first = 0;
     struct stat statshm;
-    FILE *pf = NULL;
 
     /* Cierre de los extremos de la tubería que no se van a usar */
     close(fd[0]);
@@ -164,12 +163,13 @@ void minero_main(int n_threads, int n_seconds){
         exit(EXIT_FAILURE);
     }
 
-    /* Identificar el primer minero que llega */
+    /* Conexión a memoria */
     if(sem_trywait(sem_minero) == 0){
 
-        printf("[%d]: Soy el primer minero\n", getpid());
-
         /* Soy el primer minero */
+
+        printf("[%d]: Soy el primer minero\n", getpid());
+        first = 1;
 
         /* Creación el segmento de memoria compartida */
         fd_shm = shm_open(SHM_NAME, O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
@@ -195,28 +195,59 @@ void minero_main(int n_threads, int n_seconds){
         /* Configuración inicial de la estructura del segmento compartido */
         sistema_init(sistema);
 
-        /* Registro del minero con su PID en el sistema */
-        sem_wait(&sistema->mutex);
+    }else{
+            
+        /* No soy el primer minero */
+        printf("[%d]: No soy el primer minero\n", getpid());
 
-        /* Comprobar el número de mineros */
-        if(sistema->n_mineros == MAX_MINEROS){
-            printf("[ERROR] El número máximo de mineros ha sido alcanzado\n");
-            /* LIMPIAR RECURSOS */
+        /* Abrir el segmento de memoria compartida */
+        fd_shm = shm_open(SHM_NAME, O_RDWR, 0);
+        if(fd_shm == -1){
+            perror("[ERROR] No se ha podido abrir el segmento de memoria compartida\n");
             exit(EXIT_FAILURE);
         }
 
-        /* Registro del minero con su PID en el sistema */
-        /* Atravesamos el array por si un minero en la posición 7 se va mientras que el último
-            registrado está en la posición 15 */
-        for(i = 0; i < MAX_MINEROS; i++){
-            if(sistema->pids[i] == -1){
-                sistema->pids[i] = getpid();
-                break;
-            }
+        /* Intento de mapeo checkeando el semáforo o la size...... (REVISAR) */
+
+        /* Mapeo del segmento de memoria */
+        sistema = mmap(NULL, sizeof(Sistema), PROT_READ | PROT_WRITE, MAP_SHARED, fd_shm, 0);
+        if(sistema == MAP_FAILED){
+            perror("[ERROR] No se ha podido mapear el segmento de memoria compartida\n");
+            exit(EXIT_FAILURE);
         }
-        sistema->n_mineros++;
-        
-        sem_post(&sistema->mutex);
+
+        /* Comprobar el tamaño del segmento o el último semáforo */
+        fstat(fd_shm, &statshm);
+        while(statshm.st_size != sizeof(Sistema)){
+            fstat(fd_shm, &statshm);
+        }
+
+    }
+
+    /** COMÚN **/
+
+    /* Registro del minero con su PID en el sistema */
+    sem_wait(&sistema->mutex);
+    /* Comprobar el número de mineros */
+    if(sistema->n_mineros == MAX_MINEROS){
+        printf("[ERROR] El número máximo de mineros ha sido alcanzado\n");
+        /* LIMPIAR RECURSOS */
+        exit(EXIT_FAILURE);
+    }
+
+    /* Atravesamos el array por si un minero en la posición 7 se va mientras que el último
+        registrado está en la posición 15 */
+    for(i = 0; i < MAX_MINEROS; i++){
+        if(sistema->pids[i] == -1){
+            sistema->pids[i] = getpid();
+            break;
+        }
+    }
+    sistema->n_mineros++;
+    sem_post(&sistema->mutex);
+
+    /* Preparación */
+    if(first == 1){
 
         /* Configuración del bloque inicial */
         sem_wait(&sistema->mutex);
@@ -236,49 +267,6 @@ void minero_main(int n_threads, int n_seconds){
         got_SIGUSR1 = 1;
 
     }else{
-            
-        /* No soy el primer minero */
-        printf("[%d]: No soy el primer minero\n", getpid());
-
-        /* Abrir el segmento de memoria compartida */
-        fd_shm = shm_open(SHM_NAME, O_RDWR, 0);
-
-        /* Mapeo del segmento de memoria */
-        sistema = mmap(NULL, sizeof(Sistema), PROT_READ | PROT_WRITE, MAP_SHARED, fd_shm, 0);
-        if(sistema == MAP_FAILED){
-            perror("[ERROR] No se ha podido mapear el segmento de memoria compartida\n");
-            exit(EXIT_FAILURE);
-        }
-
-        /* Comprobar el tamaño del segmento o el último semáforo */
-        fstat(fd_shm, &statshm);
-        while(statshm.st_size != sizeof(Sistema)){
-            fstat(fd_shm, &statshm);
-        }
-
-        /* Registro del minero con su PID en el sistema */
-        sem_wait(&sistema->mutex);
-
-        /* Comprobar el número de mineros */
-        if(sistema->n_mineros == MAX_MINEROS){
-            printf("[ERROR] El número máximo de mineros ha sido alcanzado\n");
-            /* LIMPIAR RECURSOS */
-            exit(EXIT_FAILURE);
-        }
-
-        /* Registro del minero con su PID en el sistema */
-        /* Atravesamos el array por si un minero en la posición 7 se va mientras que el último
-            registrado está en la posición 15 */
-        for(i = 0; i < MAX_MINEROS; i++){
-            if(sistema->pids[i] == -1){
-                sistema->pids[i] = getpid();
-                printf("[%d]: Registrado en la posición %d\n", getpid(), i);
-                break;
-            }
-        }
-        sistema->n_mineros++;
-        
-        sem_post(&sistema->mutex);
 
         /* Esperar a recibir la señal SIGUSR1 */
         while(got_SIGUSR1 == 0){
@@ -286,15 +274,6 @@ void minero_main(int n_threads, int n_seconds){
         }
 
     }
-
-    sem_wait(&sistema->mutex);
-    printf("[%d]: Número de mineros: %d\n", getpid(), sistema->n_mineros);
-    for(i = 0; i < MAX_MINEROS; i++){
-        if(sistema->pids[i] != -1){
-            printf("[%d]: Minero registrado en la posición %d: %d\n", getpid(), i, sistema->pids[i]);
-        }
-    }
-    sem_post(&sistema->mutex);
 
     /* Bucle principal */
     while(got_SIGUSR1 == 1){
@@ -325,7 +304,6 @@ void minero_main(int n_threads, int n_seconds){
 
             /* Actualización del bloque */
             sem_wait(&sistema->mutex);
-
             sistema->current.solution = target;
             sistema->current.winner = getpid();
 
@@ -362,7 +340,7 @@ void minero_main(int n_threads, int n_seconds){
 
                 sem_post(&sistema->mutex);
                 
-                usleep(5000);
+                usleep(500);
                 j++;
             }
 
@@ -378,7 +356,6 @@ void minero_main(int n_threads, int n_seconds){
 
             printf("[%d]: Votos: %d-%d\n", getpid(), yes, no);
 
-            /* Si se recibe la aprobación, actualizar Bloque */
             /* Número total de votos */
             sistema->current.votes = yes + no;
 
@@ -408,13 +385,10 @@ void minero_main(int n_threads, int n_seconds){
             yes = 0;
             no = 0;
 
-            sem_post(&sistema->mutex);
-
             /* Enviar bloque resulto a Monitor mediante cola de mensajes */
             /* Sincronizar con semáforos con nombre */
 
             /* Preparar bloque para nueva ronda */
-            sem_wait(&sistema->mutex);
             sistema->last = sistema->current;
             bloque_init(&sistema->current, sistema, target);
             sem_post(&sistema->mutex);
@@ -428,21 +402,17 @@ void minero_main(int n_threads, int n_seconds){
             printf("[%d]: Enviado bloque al registrador\n", getpid());
             sem_post(&sistema->mutex);
 
-            printf("[%d]: SOY GANADOR: Pŕoximo bloque:\n", getpid());
-            print_bloque(sistema->current);
-            printf("\n");
-
             /* Enviar señal SIGUSR1 a los demás mineros */
             sem_wait(&sistema->mutex);
+
+            /* Liberar el semáforo winner */
+            sem_post(sem_winner);
 
             for(i = 0; i < MAX_MINEROS; i++){
                 if(sistema->pids[i] != -1 && sistema->pids[i] != getpid()){
                     kill(sistema->pids[i], SIGUSR1);
                 }
             }
-
-            /* Liberar el semáforo winner */
-            sem_post(sem_winner);
 
             sem_post(&sistema->mutex);
 
@@ -461,8 +431,6 @@ void minero_main(int n_threads, int n_seconds){
 
             /* Votar */
             sem_wait(&sistema->mutex);
-
-            /* Votar a favor */
             if(pow_hash(sistema->current.solution) == sistema->current.target){
 
                 for(i = 0; i < MAX_MINEROS; i++){
@@ -482,7 +450,6 @@ void minero_main(int n_threads, int n_seconds){
                 }
 
             }
-
             sem_post(&sistema->mutex);
 
             sem_wait(&sistema->mutex);
@@ -738,7 +705,7 @@ void *prueba_de_fuerza(void *info) {
 
     /* Se prueba la fuerza bruta */
     i = thInfo->lower;
-    while(got_SIGUSR2 == 0 || found == 0){
+    while(got_SIGUSR2 == 0 && found == 0){
 
         /* Se comprueba que el número no se salga del rango */
         if(i > thInfo->upper) {
