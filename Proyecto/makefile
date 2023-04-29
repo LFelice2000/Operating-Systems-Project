@@ -1,4 +1,4 @@
-EXE = miner
+EXE = miner monitor
 FLAGS = -g -pedantic -Wall -pedantic
 LIBS = -lpthread -lrt -lm
 

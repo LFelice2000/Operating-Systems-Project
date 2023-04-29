@@ -14,6 +14,8 @@
 #include <mqueue.h>
 #include <math.h>
 #include <sys/mman.h>
+#include <mqueue.h>
+
 #include "miner.h"
 #include "pow.h"
 
@@ -21,8 +23,10 @@
 #define SEM_WINNER "/sem_winner"
 #define SHM_NAME "/shm_sistema"
 
+#define MQ_LEN 7
+#define MQ_NAME "/mq_monitor"
+
 int found = 0;
-int solution = 0;
 int target = 0;
 
 int fd[2];
@@ -38,6 +42,9 @@ Minero *minero = NULL;
 
 sigset_t set, oldset;
 struct sigaction act;
+
+mqd_t mq;
+struct mq_attr attributes;
 
 void handler(int sig){
     if(sig == SIGUSR1){
@@ -168,7 +175,7 @@ void minero_main(int n_threads, int n_seconds){
 
         /* Soy el primer minero */
 
-        printf("[%d]: Soy el primer minero\n", getpid());
+        //printf("[%d]: Soy el primer minero\n", getpid());
         first = 1;
 
         /* Creación el segmento de memoria compartida */
@@ -198,7 +205,7 @@ void minero_main(int n_threads, int n_seconds){
     }else{
             
         /* No soy el primer minero */
-        printf("[%d]: No soy el primer minero\n", getpid());
+        //printf("[%d]: No soy el primer minero\n", getpid());
 
         /* Abrir el segmento de memoria compartida */
         fd_shm = shm_open(SHM_NAME, O_RDWR, 0);
@@ -230,7 +237,7 @@ void minero_main(int n_threads, int n_seconds){
     sem_wait(&sistema->mutex);
     /* Comprobar el número de mineros */
     if(sistema->n_mineros == MAX_MINEROS){
-        printf("[ERROR] El número máximo de mineros ha sido alcanzado\n");
+        //printf("[ERROR] El número máximo de mineros ha sido alcanzado\n");
         /* LIMPIAR RECURSOS */
         exit(EXIT_FAILURE);
     }
@@ -244,7 +251,25 @@ void minero_main(int n_threads, int n_seconds){
         }
     }
     sistema->n_mineros++;
+
+    for(i = 0; i < MAX_MINEROS; i++){
+        if(sistema->wallets[i].pid == -1){
+            sistema->wallets[i].pid = getpid();
+            break;
+        }
+    }
+
     sem_post(&sistema->mutex);
+
+    /* Abrir la cola de mensajes */
+    attributes.mq_maxmsg = MQ_LEN;
+    attributes.mq_msgsize = sizeof(Bloque);
+
+    if ((mq = mq_open(MQ_NAME, O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR, &attributes)) == (mqd_t)-1)
+    {
+        perror("mq_open");
+        exit(EXIT_FAILURE);
+    }
 
     /* Preparación */
     if(first == 1){
@@ -259,7 +284,7 @@ void minero_main(int n_threads, int n_seconds){
         for(i = 0; i < MAX_MINEROS; i++){
             if(sistema->pids[i] != -1 && sistema->pids[i] != getpid()){
                 kill(sistema->pids[i], SIGUSR1);
-                printf("[%d]: Enviada señal SIGUSR1 a %d\n", getpid(), sistema->pids[i]);
+                //printf("[%d]: Enviada señal SIGUSR1 a %d\n", getpid(), sistema->pids[i]);
             }
         }
         sem_post(&sistema->mutex);
@@ -284,9 +309,7 @@ void minero_main(int n_threads, int n_seconds){
         sigprocmask(SIG_UNBLOCK, &set, &oldset);
 
         /* Minado hasta que sea el primero en encontrar la solución */
-        solution = minado(n_threads, sistema);
-
-        printf("[%d]: %08d-%08d\n", getpid(), sistema->current.target, solution);
+        minado(n_threads, sistema);
 
         /* Bloquear la máscara de señales */
         sigprocmask(SIG_BLOCK, &set, &oldset);
@@ -294,16 +317,17 @@ void minero_main(int n_threads, int n_seconds){
         /* Intento de proclamación de ganador */
         if(sem_trywait(sem_winner) == 0){
 
-            printf("----------- ENTRO %d -----------\n", getpid());
+            sem_wait(&sistema->mutex);
+
+            //printf("----------- ENTRO %d -----------\n", getpid());
 
             /* Soy el ganador */
 
-            printf("[%d]: Soy el ganador\n", getpid());
+            //printf("[%d]: Soy el ganador\n", getpid());
 
             got_SIGUSR2 = 0;
 
             /* Actualización del bloque */
-            sem_wait(&sistema->mutex);
             sistema->current.solution = target;
             sistema->current.winner = getpid();
 
@@ -354,7 +378,9 @@ void minero_main(int n_threads, int n_seconds){
                 }
             }
 
-            printf("[%d]: Votos: %d-%d\n", getpid(), yes, no);
+            yes++;
+
+            //printf("[%d]: Votos: %d-%d\n", getpid(), yes, no);
 
             /* Número total de votos */
             sistema->current.votes = yes + no;
@@ -387,6 +413,10 @@ void minero_main(int n_threads, int n_seconds){
 
             /* Enviar bloque resulto a Monitor mediante cola de mensajes */
             /* Sincronizar con semáforos con nombre */
+            if(mq_send(mq, (char *)&sistema->current, sizeof(Bloque), 0) == -1){
+                perror("mq_send");
+                exit(EXIT_FAILURE);
+            }
 
             /* Preparar bloque para nueva ronda */
             sistema->last = sistema->current;
@@ -399,7 +429,8 @@ void minero_main(int n_threads, int n_seconds){
                 perror("write");
                 exit(EXIT_FAILURE);
             }
-            printf("[%d]: Enviado bloque al registrador\n", getpid());
+            //printf("Próximo bloque: \n");
+            //print_bloque(sistema->current);
             sem_post(&sistema->mutex);
 
             /* Enviar señal SIGUSR1 a los demás mineros */
@@ -458,7 +489,7 @@ void minero_main(int n_threads, int n_seconds){
                 perror("write");
                 exit(EXIT_FAILURE);
             }
-            printf("[%d]: Enviado bloque al registrador\n", getpid());
+            //printf("[%d]: Enviado bloque al registrador\n", getpid());
             sem_post(&sistema->mutex);
 
             while(got_SIGUSR1 == 0){
@@ -480,17 +511,15 @@ void print_bloque(Bloque b){
 
 }
 
-void registrador(int fd_in[2]){
+void registrador(){
 
-    FILE *pf = NULL;
     ssize_t nbytes;
     Bloque bloque;
-    char msg[20];
     char filename[20];
     int i, file = 0;
 
     /* Cierre del extremo de escritura del pipe */
-    close(fd_in[1]);
+    close(fd[1]);
 
     /* Creación del archivo de registro */
     sprintf(filename, "%d.txt", getppid());
@@ -501,11 +530,11 @@ void registrador(int fd_in[2]){
         exit(EXIT_FAILURE);
     }
 
-    printf("[%d] Registrador creado para %d\n", getpid(), getppid());
+    //printf("[%d] Registrador creado para %d\n", getpid(), getppid());
     
     do{
 
-        nbytes = read(fd_in[0], &bloque, sizeof(Bloque));
+        nbytes = read(fd[0], &bloque, sizeof(Bloque));
         if(nbytes == -1){
             perror("[ERROR] No se ha podido leer el bloque del pipe\n");
             exit(EXIT_FAILURE);
@@ -513,35 +542,35 @@ void registrador(int fd_in[2]){
 
         if(nbytes > 0){
 
-            printf("[%d] Bloque recibido\n", getpid());
-            print_bloque(bloque);
-            printf("[%d] Bloque resgistrado\n\n", getpid());
+            //printf("[%d] Bloque recibido\n", getpid());
+            //print_bloque(bloque);
+            //printf("[%d] Bloque resgistrado\n\n", getpid());
 
-            printf("[R] Registrador %d escribiendo en %s\n", getpid(), filename);
+            //printf("[R] Registrador %d escribiendo en %s\n", getpid(), filename);
 
-            dprintf(file, "Id:\t\t\t%04d\n", bloque.id);
-            dprintf(file, "Winner:\t\t%d\n", bloque.winner);
-            dprintf(file, "Target:\t\t%08d\n", bloque.target);
-            dprintf(file, "Solution:\t%08d", bloque.solution);
-            if(bloque.positives > bloque.votes/2){
+            dprintf(file, "Id:       %04d\n", bloque.id);
+            dprintf(file, "Winner:   %d\n", bloque.winner);
+            dprintf(file, "Target:   %08d\n", bloque.target);
+            dprintf(file, "Solution: %08d", bloque.solution);
+            if(bloque.positives >= bloque.votes/2){
                 dprintf(file, " (validated)\n");
             }else{
                 dprintf(file, " (rejected)\n");
             }
-            dprintf(file, "Votes:\t\t%d/%d\n", bloque.positives, bloque.votes);
-            dprintf(file, "Wallets:\t\t\t");
+            dprintf(file, "Votes:    %d/%d\n", bloque.positives, bloque.votes);
+            dprintf(file, "Wallets:  ");
             for(i = 0; i < MAX_MINEROS; i++){
                 if(bloque.wallets[i].pid != -1){
                     dprintf(file, "%d:%02d ", bloque.wallets[i].pid, bloque.wallets[i].coins);
                 }
             }
-            dprintf(file, "\n");
+            dprintf(file, "\n\n");
         }
 
     } while(nbytes != 0);
 
     close(file);
-    close(fd_in[0]);
+    close(fd[0]);
 
     exit(EXIT_SUCCESS);
 
@@ -580,6 +609,11 @@ void sistema_init(Sistema *sistema){
         exit(EXIT_FAILURE);
     }
 
+    if(sem_init(&(sistema->winner), 1, 1) == -1){
+        perror("[ERROR] No se ha podido inicializar el semáforo winner\n");
+        exit(EXIT_FAILURE);
+    }
+
 }
 
 void bloque_init(Bloque *bloque, Sistema *sistema, int target){
@@ -591,6 +625,7 @@ void bloque_init(Bloque *bloque, Sistema *sistema, int target){
     bloque->winner = -1;
     bloque->votes = 0;
     bloque->positives = 0;
+    bloque->flag = -1;
 
     /* Inicialización de las carteras */
     for(int i = 0; i < MAX_MINEROS; i++){
@@ -630,7 +665,7 @@ Bloque *bloque_copy(Bloque *src){
 
 }
 
-int minado(int n_threads, Sistema *sistema){
+void minado(int n_threads, Sistema *sistema){
 
     pthread_t *threads = NULL;
     Info *thInfo = NULL;
@@ -640,7 +675,7 @@ int minado(int n_threads, Sistema *sistema){
     threads = (pthread_t*)malloc(n_threads*sizeof(pthread_t));
     if(threads == NULL) {
         fprintf(stderr, "Error: no se ha podido reservar memoria para los identificadores de los hilos.\n");
-        return EXIT_FAILURE;
+        return;
     }
 
     /* Se crea un array para guardar la información de los hilos */
@@ -648,7 +683,7 @@ int minado(int n_threads, Sistema *sistema){
     if(thInfo == NULL) {
         fprintf(stderr, "Error: no se ha podido reservar memoria para la información de los hilos.\n");
         free(threads);
-        return EXIT_FAILURE;
+        return;
     }
 
     /* Se calcula el número de iteraciones que realizará cada hilo */
@@ -673,7 +708,7 @@ int minado(int n_threads, Sistema *sistema){
         if(err != 0) {
             fprintf(stderr, "pthread_create : %s\n", strerror(err));
             free(threads);
-            return EXIT_FAILURE;
+            return;
         }
     
     }
@@ -685,7 +720,7 @@ int minado(int n_threads, Sistema *sistema){
         if(err != 0) {
             fprintf(stderr, "pthread_join : %s\n", strerror(err));
             free(threads);
-            return EXIT_FAILURE;
+            return;
         }
 
     }
@@ -694,7 +729,7 @@ int minado(int n_threads, Sistema *sistema){
     free(threads);
     free(thInfo);
 
-    return target;
+    return;
     
 }
 
@@ -705,7 +740,7 @@ void *prueba_de_fuerza(void *info) {
 
     /* Se prueba la fuerza bruta */
     i = thInfo->lower;
-    while(got_SIGUSR2 == 0 && found == 0){
+    while(found == 0 || got_SIGUSR2 == 0){
 
         /* Se comprueba que el número no se salga del rango */
         if(i > thInfo->upper) {
@@ -735,13 +770,21 @@ void *prueba_de_fuerza(void *info) {
 
 void clear(){
 
-    int last = 0;
+    Bloque bloque;
+    int last = 0, i = 0;
 
     /* Desregistrarse del sistema */
     sem_wait(&sistema->mutex);
-    for(int i = 0; i < MAX_MINEROS; i++){
+    for(i = 0; i < MAX_MINEROS; i++){
         if(sistema->pids[i] == getpid()){
             sistema->pids[i] = -1;
+            break;
+        }
+    }
+
+    for(i = 0; i < MAX_MINEROS; i++){
+        if(sistema->wallets[i].pid == getpid()){
+            sistema->wallets[i].pid = -1;
             break;
         }
     }
@@ -760,8 +803,8 @@ void clear(){
 
         /* Enviar bloque de finalización al Monitor */
 
-        //bloque_init(&bloque, sistema, -1)
-        //mq_send(mq_monitor, (char*)&bloque, sizeof(Bloque), 0);
+        bloque_init(&bloque, sistema, -1);
+        mq_send(mq, (char*)&bloque, sizeof(Bloque), 0);
 
         sem_post(&sistema->mutex);
 
@@ -772,7 +815,7 @@ void clear(){
         munmap(sistema, sizeof(Sistema));
 
         /* Cerrar la cola de mensajes */
-        //mq_close(mq_monitor);
+        mq_close(mq);
 
         /* Eliminar el segmento de memoria */
         shm_unlink(SHM_NAME);
@@ -792,6 +835,10 @@ void clear(){
 
     /* Cerrar pipe con el proceso Registrador */
     close(fd[0]);
+
+    /* Cerrar cola de mensajes */
+    mq_close(mq);
+
 
 }
 

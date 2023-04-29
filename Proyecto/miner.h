@@ -16,6 +16,7 @@ typedef struct Bloque{
     Wallet wallets[MAX_MINEROS];
     int votes;
     int positives;
+    int flag;
 } Bloque;
 
 typedef struct Sistema{
@@ -27,6 +28,7 @@ typedef struct Sistema{
     Bloque last;
     Bloque current; 
     sem_t mutex;
+    sem_t winner;
 } Sistema;
 
 typedef struct Info {
@@ -49,9 +51,11 @@ void bloque_init(Bloque *bloque, Sistema *sistema, int target);
 
 Bloque *bloque_copy(Bloque *src);
 
-int minado(int n_threads, Sistema *sistema);
+void minado(int n_threads, Sistema *sistema);
 
 void *prueba_de_fuerza(void *info);
+
+void print_bloque(Bloque b);
 
 void clear();
 
