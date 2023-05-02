@@ -12,6 +12,7 @@
 #include <string.h>
 #include <time.h>
 #include <sys/wait.h>
+#include <signal.h>
 
 #include "monitor.h"
 #include "pow.h"
@@ -20,13 +21,31 @@
 #define MQ_LEN 7
 #define MQ_NAME "/mq_monitor"
 #define SHM_NAME "/shm_monitor"
+#define SEM_MQUEUE "/sem_mqueue"
 
+pid_t pid;
 int fd_shm;
 shm_struct *shm_struc;
 
-int main(int argc, char *argv[]){
+int got_SIGINT = 0;
 
-    pid_t pid;
+sigset_t set, oldset;
+struct sigaction act;
+
+sem_t *sem_mqueue;
+
+struct mq_attr attributes;
+mqd_t mq;
+
+void handler(int sig){
+    if(sig == SIGINT){
+        got_SIGINT = 1;
+        clear();
+        exit(EXIT_SUCCESS);
+    }
+}
+
+int main(int argc, char *argv[]){
 
     /* El proceso Comprobador crea el segmento de memoria compartida */
     fd_shm = shm_open(SHM_NAME, O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
@@ -37,7 +56,6 @@ int main(int argc, char *argv[]){
                 perror("Error opening the shared memory segment\n");
                 exit(EXIT_FAILURE);
             }
-            exit(EXIT_SUCCESS);
         }
     }
 
@@ -74,7 +92,10 @@ int main(int argc, char *argv[]){
         exit(EXIT_SUCCESS);
     }else{
         comprobador();
-        wait(NULL);
+        waitpid(pid, NULL, 0);
+        if(got_SIGINT == 1){
+            exit(EXIT_FAILURE);
+        }
         exit(EXIT_SUCCESS);
     }
 
@@ -115,12 +136,26 @@ void init_struct(shm_struct *shm_struc)
 
 void comprobador(){
 
-    struct mq_attr attributes;
-    mqd_t mq;
-    int exit_loop = 0, prior, flag;
+    int exit_loop = 0, prior, flag, value;
     Bloque bloque;
 
+    sem_mqueue = sem_open(SEM_MQUEUE, O_CREAT, S_IRUSR | S_IWUSR, 0);
+    if(sem_mqueue == SEM_FAILED){
+        perror("sem_open");
+        exit(EXIT_FAILURE);
+    }
 
+    /* Preparar señal SIGINT */
+    act.sa_handler = handler;
+    sigemptyset(&act.sa_mask);
+    act.sa_flags = 0;
+
+    if (sigaction(SIGINT, &act, NULL) == -1){
+        perror("sigaction");
+        exit(EXIT_FAILURE);
+    }
+
+    /* Preparar cola de mensajes */
     attributes.mq_maxmsg = MQ_LEN;
     attributes.mq_msgsize = sizeof(Bloque);
 
@@ -135,14 +170,23 @@ void comprobador(){
 
         fflush(stdout);
 
-        /* Recibe el bloque por la cola de mensajes */
-        if (mq_receive(mq, (char *)&bloque, sizeof(Bloque), &prior) == -1)
-        {
-            perror("mq_receive");
-            mq_close(mq);
-            exit(EXIT_FAILURE);
-        }
+        if(got_SIGINT == 0){
 
+            /* Avisamos al minero de que puede enviar un bloque */
+            sem_post(sem_mqueue);
+
+            /* Recibe el bloque por la cola de mensajes */
+            if (mq_receive(mq, (char *)&bloque, sizeof(Bloque), &prior) == -1)
+            {
+                perror("mq_receive");
+                mq_close(mq);
+                exit(EXIT_FAILURE);
+            }
+
+        }else{
+            bloque.target = -1;
+        }
+        
         /* Comprueba si es el bloque de finalización */
         if (bloque.target == -1)
         {
@@ -150,7 +194,6 @@ void comprobador(){
         }
         else
         {
-
             /* Comprobar solución */
             flag = comprobar(bloque.target, bloque.solution);
 
@@ -178,8 +221,6 @@ void comprobador(){
         sem_post(&shm_struc->sem_mutex);
         sem_post(&shm_struc->sem_fill);
 
-        /* Espera */
-        usleep(500);
     }
 
     /* Se desasocia el segmento de memoria compartida */
@@ -193,12 +234,26 @@ void comprobador(){
     mq_close(mq);
     mq_unlink(MQ_NAME);
 
+    /* Se cierra el semáforo */
+    sem_close(sem_mqueue);
+    sem_unlink(SEM_MQUEUE);
+
 }
 
 void monitor(){
 
     Bloque bloque;
     int end_loop = 0, i;
+
+    /* Preparar señal SIGINT */
+    act.sa_handler = SIG_IGN;
+    sigemptyset(&act.sa_mask);
+    act.sa_flags = 0;
+
+    if (sigaction(SIGINT, &act, NULL) == -1){
+        perror("sigaction");
+        exit(EXIT_FAILURE);
+    }
 
     /* Extrae bloque de memoria compartida */
     while (end_loop == 0)
@@ -254,8 +309,6 @@ void monitor(){
         sem_post(&shm_struc->sem_mutex);
         sem_post(&shm_struc->sem_empty);
 
-        /* Espera */
-        usleep(500);
     }
 
     /* Se destruyen los semáforos sin nombre porque somos el último proceso en usarlos */
@@ -286,4 +339,46 @@ int comprobar(int target, int res)
     }
 
     return flag;
+}
+
+void clear(){
+
+    Bloque bloque;
+
+    bloque.target = -1;
+
+    /* Espera a que haya espacio en el buffer */
+    sem_wait(&shm_struc->sem_empty);
+    /* Protegemos el acceso a memoria compartida */
+    sem_wait(&shm_struc->sem_mutex);
+    /* Escribir bloque en memoria compartida */
+
+    shm_struc->rear++;
+    if (shm_struc->rear == BUFFER_SIZE)
+    {
+        shm_struc->rear = 0;
+    }
+    shm_struc->rear = shm_struc->rear % BUFFER_SIZE;
+    shm_struc->buffer[shm_struc->rear] = bloque;
+
+    sem_post(&shm_struc->sem_mutex);
+    sem_post(&shm_struc->sem_fill);
+
+    /* Se desasocia el segmento de memoria compartida */
+    if (munmap(shm_struc, sizeof(shm_struct)) == -1)
+    {
+        perror("munmap");
+        exit(EXIT_FAILURE);
+    }
+
+    /* Se cierra la cola de mensajes y se elimina porque somos el último proceso en usarla */
+    mq_close(mq);
+    //mq_unlink(MQ_NAME);
+
+    /* Se cierra el semáforo */
+    sem_close(sem_mqueue);
+    //sem_unlink(SEM_MQUEUE);
+
+    waitpid(pid, NULL, 0);
+
 }

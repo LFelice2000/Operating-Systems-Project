@@ -21,6 +21,7 @@
 
 #define SEM_NAME "/sem_minero"
 #define SEM_WINNER "/sem_winner"
+#define SEM_MQUEUE "/sem_mqueue"
 #define SHM_NAME "/shm_sistema"
 
 #define MQ_LEN 7
@@ -33,9 +34,11 @@ int fd[2];
 
 int got_SIGUSR1 = 0;
 int got_SIGUSR2 = 0;
+int not_monitor = 0;
 
 sem_t *sem_minero;
 sem_t *sem_winner;
+sem_t *sem_mqueue;
 
 Sistema *sistema = NULL;
 Minero *minero = NULL;
@@ -104,7 +107,7 @@ int main(int argc, char *argv[]){
 
 }
 
-void señales(int n_seconds){
+void signals(int n_seconds){
 
     /* Configuración de las señales */
     act.sa_handler = handler;
@@ -147,14 +150,14 @@ void señales(int n_seconds){
 
 void minero_main(int n_threads, int n_seconds){
     
-    int fd_shm, i, j, count = 0, yes = 0, no = 0, first = 0;
+    int fd_shm, i, j, count = 0, yes = 0, no = 0, first = 0, value = 0;
     struct stat statshm;
 
     /* Cierre de los extremos de la tubería que no se van a usar */
     close(fd[0]);
 
     /* Configuración de las señales */
-    señales(n_seconds);
+    signals(n_seconds);
 
     /* Creación o apertura del semáforo de los mineros */
     sem_minero = sem_open(SEM_NAME, O_CREAT, S_IRUSR | S_IWUSR, 1);
@@ -166,6 +169,12 @@ void minero_main(int n_threads, int n_seconds){
     /* Creación o apertura del semáforo del ganador */
     sem_winner = sem_open(SEM_WINNER, O_CREAT, S_IRUSR | S_IWUSR, 1);
     if(sem_winner == SEM_FAILED){
+        printf("[ERROR] No se ha podido crear el semáforo\n");
+        exit(EXIT_FAILURE);
+    }
+
+    sem_mqueue = sem_open(SEM_MQUEUE, O_CREAT, S_IRUSR | S_IWUSR, 0);
+    if(sem_mqueue == SEM_FAILED){
         printf("[ERROR] No se ha podido crear el semáforo\n");
         exit(EXIT_FAILURE);
     }
@@ -413,9 +422,17 @@ void minero_main(int n_threads, int n_seconds){
 
             /* Enviar bloque resulto a Monitor mediante cola de mensajes */
             /* Sincronizar con semáforos con nombre */
-            if(mq_send(mq, (char *)&sistema->current, sizeof(Bloque), 0) == -1){
-                perror("mq_send");
-                exit(EXIT_FAILURE);
+            
+            sem_getvalue(sem_mqueue, &value);
+            if(sem_trywait(sem_mqueue) == 0){
+                if(mq_send(mq, (char *)&sistema->current, sizeof(Bloque), 0) == -1){
+                    if(errno == EAGAIN){
+                        printf("se cerró el monitor\n");
+                    }else{
+                        perror("mq_send normal");
+                        exit(EXIT_FAILURE);
+                    }
+                }
             }
 
             /* Preparar bloque para nueva ronda */
@@ -429,6 +446,7 @@ void minero_main(int n_threads, int n_seconds){
                 perror("write");
                 exit(EXIT_FAILURE);
             }
+
             //printf("Próximo bloque: \n");
             //print_bloque(sistema->current);
             sem_post(&sistema->mutex);
@@ -616,11 +634,11 @@ void sistema_init(Sistema *sistema){
 
 }
 
-void bloque_init(Bloque *bloque, Sistema *sistema, int target){
+void bloque_init(Bloque *bloque, Sistema *sistema, int given_target){
 
     bloque->id = sistema->n_bloques;
     sistema->n_bloques++;
-    bloque->target = target;
+    bloque->target = given_target;
     bloque->solution = -1;
     bloque->winner = -1;
     bloque->votes = 0;
@@ -804,7 +822,17 @@ void clear(){
         /* Enviar bloque de finalización al Monitor */
 
         bloque_init(&bloque, sistema, -1);
-        mq_send(mq, (char*)&bloque, sizeof(Bloque), 0);
+
+        if(sem_trywait(sem_mqueue) == 0){
+            if(mq_send(mq, (char *)&bloque, sizeof(Bloque), 0) == -1){
+                if(errno == EAGAIN){
+                    printf("se cerró el monitor\n");
+                }else{
+                    perror("mq_send normal");
+                    exit(EXIT_FAILURE);
+                }
+            }
+        }
 
         sem_post(&sistema->mutex);
 
@@ -817,6 +845,13 @@ void clear(){
         /* Cerrar la cola de mensajes */
         mq_close(mq);
 
+        /* Eliminar la cola de mensajes */
+        mq_unlink(MQ_NAME);
+
+        sem_close(sem_minero);
+        sem_close(sem_winner);
+        sem_close(sem_mqueue);
+
         /* Eliminar el segmento de memoria */
         shm_unlink(SHM_NAME);
 
@@ -826,12 +861,16 @@ void clear(){
         /* Eliminar el semáforo del ganador */
         sem_unlink(SEM_WINNER);
 
+        /* Eliminar el semáforo de la cola de mensajes */
+        sem_unlink(SEM_MQUEUE);
+
         /* Cerrar pipe con el proceso Registrador */
         close(fd[1]);
     }
 
     sem_close(sem_minero);
     sem_close(sem_winner);
+    sem_close(sem_mqueue);
 
     /* Cerrar pipe con el proceso Registrador */
     close(fd[0]);

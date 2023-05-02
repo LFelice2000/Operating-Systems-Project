@@ -47,7 +47,7 @@ void registrador();
 
 void sistema_init(Sistema *sistema);
 
-void bloque_init(Bloque *bloque, Sistema *sistema, int target);
+void bloque_init(Bloque *bloque, Sistema *sistema, int given_target);
 
 Bloque *bloque_copy(Bloque *src);
 
@@ -56,6 +56,8 @@ void minado(int n_threads, Sistema *sistema);
 void *prueba_de_fuerza(void *info);
 
 void print_bloque(Bloque b);
+
+void signals(int n_seconds);
 
 void clear();
 

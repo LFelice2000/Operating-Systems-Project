@@ -94,7 +94,7 @@ mineros.
 
 
 MÁS COSAS::::::::::::::::::
-- falta sigint a monitor
+- (HECHO) falta sigint a monitor
 - falta check SIGUSR2 (main problema)
 - el propio winner se vota?
 - probar un propio bloque para enviar
