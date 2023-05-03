@@ -63,12 +63,10 @@ al proceso monitor
 - cuando un hilo encuentra la solución, los demás hilos acaban y además los hilos de los demás mineros también acaban?
 - qué les hace salir del minado a los otro mineros? SIGUSR2? pero luego, vuelven a esperar a SIGUSR2 para votar, entonces?
 
-
 - cada minero envía el bloque ganador a su padre Registrador
 - el registrador luego lo escribe en un fichero
-- para votar, hace rpow_hash otra vez
+- para votar, hace pow_hash otra vez
 - el sistema guarda el array de carteras
-- dos SIGUSR2
 
 /*** RESUELTO ***/
 
@@ -95,7 +93,13 @@ mineros.
 
 MÁS COSAS::::::::::::::::::
 - (HECHO) falta sigint a monitor
-- falta check SIGUSR2 (main problema)
-- el propio winner se vota?
-- probar un propio bloque para enviar
+- (HECHO) falta check SIGUSR2 (main problema)
+- (SI) el propio winner se vota?
+- (NO HACE FALTA) probar un propio bloque para enviar
+
+
+
+ULTIMA COSA:
+
+- proteger la comprobación de que todos los mineros han votado con el mutex 
 
