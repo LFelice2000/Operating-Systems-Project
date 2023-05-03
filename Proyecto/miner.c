@@ -150,7 +150,7 @@ void signals(int n_seconds){
 
 void minero_main(int n_threads, int n_seconds){
     
-    int fd_shm, i, j, count = 0, yes = 0, no = 0, first = 0, value = 0;
+    int fd_shm, i, j, count = 0, yes = 0, no = 0, first = 0;
     struct stat statshm;
 
     /* Cierre de los extremos de la tubería que no se van a usar */
@@ -293,7 +293,6 @@ void minero_main(int n_threads, int n_seconds){
         for(i = 0; i < MAX_MINEROS; i++){
             if(sistema->pids[i] != -1 && sistema->pids[i] != getpid()){
                 kill(sistema->pids[i], SIGUSR1);
-                //printf("[%d]: Enviada señal SIGUSR1 a %d\n", getpid(), sistema->pids[i]);
             }
         }
         sem_post(&sistema->mutex);
@@ -307,6 +306,12 @@ void minero_main(int n_threads, int n_seconds){
             sigsuspend(&oldset);
         }
 
+        sem_wait(&sistema->mutex);
+        target = sistema->current.target;
+        sem_post(&sistema->mutex);
+
+        got_SIGUSR2 = 0;
+
     }
 
     /* Bucle principal */
@@ -319,6 +324,8 @@ void minero_main(int n_threads, int n_seconds){
 
         /* Minado hasta que sea el primero en encontrar la solución */
         minado(n_threads, sistema);
+
+        found = 0;
 
         /* Bloquear la máscara de señales */
         sigprocmask(SIG_BLOCK, &set, &oldset);
@@ -356,7 +363,6 @@ void minero_main(int n_threads, int n_seconds){
             /* Comprobar que todos los demás procesos han votado */
             j = 0;
             while(j < MAX_MINEROS){
-                sem_wait(&sistema->mutex);
                 for(i = 0; i < MAX_MINEROS; i++){
                     if(sistema->votes[i] != -1){
                         count++;
@@ -365,13 +371,10 @@ void minero_main(int n_threads, int n_seconds){
 
                 if(count == sistema->n_mineros - 1){
                     count = 0;
-                    sem_post(&sistema->mutex);
                     break;
                 }
 
                 count = 0;
-
-                sem_post(&sistema->mutex);
                 
                 usleep(500);
                 j++;
@@ -420,10 +423,11 @@ void minero_main(int n_threads, int n_seconds){
             yes = 0;
             no = 0;
 
+            bloque_copy(&sistema->current, &sistema->last);
+
             /* Enviar bloque resulto a Monitor mediante cola de mensajes */
             /* Sincronizar con semáforos con nombre */
             
-            sem_getvalue(sem_mqueue, &value);
             if(sem_trywait(sem_mqueue) == 0){
                 if(mq_send(mq, (char *)&sistema->current, sizeof(Bloque), 0) == -1){
                     if(errno == EAGAIN){
@@ -436,36 +440,27 @@ void minero_main(int n_threads, int n_seconds){
             }
 
             /* Preparar bloque para nueva ronda */
-            sistema->last = sistema->current;
             bloque_init(&sistema->current, sistema, target);
-            sem_post(&sistema->mutex);
-
-            sem_wait(&sistema->mutex);
-            /* Enviar último bloque resuelto al Registrador */
-            if(write(fd[1], &sistema->last, sizeof(Bloque)) == -1){
-                perror("write");
-                exit(EXIT_FAILURE);
-            }
-
-            //printf("Próximo bloque: \n");
-            //print_bloque(sistema->current);
-            sem_post(&sistema->mutex);
-
-            /* Enviar señal SIGUSR1 a los demás mineros */
-            sem_wait(&sistema->mutex);
-
-            /* Liberar el semáforo winner */
-            sem_post(sem_winner);
 
             for(i = 0; i < MAX_MINEROS; i++){
                 if(sistema->pids[i] != -1 && sistema->pids[i] != getpid()){
                     kill(sistema->pids[i], SIGUSR1);
                 }
             }
+            sem_post(&sistema->mutex);
 
+            /* Enviar último bloque resuelto al Registrador */
+            sem_wait(&sistema->mutex);
+            if(write(fd[1], &sistema->last, sizeof(Bloque)) == -1){
+                perror("write");
+                exit(EXIT_FAILURE);
+            }
             sem_post(&sistema->mutex);
 
             got_SIGUSR1 = 1;
+
+            /* Liberar el semáforo winner */
+            sem_post(sem_winner);
 
         }else{
 
@@ -501,6 +496,10 @@ void minero_main(int n_threads, int n_seconds){
             }
             sem_post(&sistema->mutex);
 
+            while(got_SIGUSR1 == 0){
+                sigsuspend(&oldset);
+            }
+
             sem_wait(&sistema->mutex);
             /* Enviar último bloque resuelto al Registrador */
             if(write(fd[1], &sistema->last, sizeof(Bloque)) == -1){
@@ -508,11 +507,8 @@ void minero_main(int n_threads, int n_seconds){
                 exit(EXIT_FAILURE);
             }
             //printf("[%d]: Enviado bloque al registrador\n", getpid());
+            target = sistema->current.target;
             sem_post(&sistema->mutex);
-
-            while(got_SIGUSR1 == 0){
-                sigsuspend(&oldset);
-            }
 
         }
                 
@@ -653,18 +649,10 @@ void bloque_init(Bloque *bloque, Sistema *sistema, int given_target){
 
 }
 
-Bloque *bloque_copy(Bloque *src){
-
-    Bloque *dest = NULL;
+void bloque_copy(Bloque *src, Bloque *dest){
 
     if(dest == NULL || src == NULL){
         fprintf(stderr, "[ERROR] No se ha podido copiar el bloque\n");
-        exit(EXIT_FAILURE);
-    }
-
-    dest = (Bloque*)malloc(sizeof(Bloque));
-    if(dest == NULL){
-        fprintf(stderr, "[ERROR] No se ha podido reservar memoria para el bloque\n");
         exit(EXIT_FAILURE);
     }
 
@@ -673,13 +661,12 @@ Bloque *bloque_copy(Bloque *src){
     dest->solution = src->solution;
     dest->winner = src->winner;
     dest->votes = src->votes;
+    dest->positives = src->positives;    
 
     for(int i = 0; i < MAX_MINEROS; i++){
         dest->wallets[i].pid = src->wallets[i].pid;
         dest->wallets[i].coins = src->wallets[i].coins;
     }
-
-    return dest;
 
 }
 
@@ -758,7 +745,7 @@ void *prueba_de_fuerza(void *info) {
 
     /* Se prueba la fuerza bruta */
     i = thInfo->lower;
-    while(found == 0 || got_SIGUSR2 == 0){
+    while(found == 0 && got_SIGUSR2 == 0){
 
         /* Se comprueba que el número no se salga del rango */
         if(i > thInfo->upper) {

@@ -26,9 +26,11 @@ typedef struct Sistema{
     int n_mineros;
     int n_bloques;
     Bloque last;
-    Bloque current; 
+    Bloque current;
+    Bloque bwinner;
     sem_t mutex;
     sem_t winner;
+    sem_t ronda;
 } Sistema;
 
 typedef struct Info {
@@ -38,7 +40,7 @@ typedef struct Info {
 
 typedef struct Minero {
     pthread_t *threads;
-    Bloque *bloque;
+    Info *thInfo;
 } Minero;
 
 void minero_main(int n_threads, int n_seconds);
@@ -49,7 +51,7 @@ void sistema_init(Sistema *sistema);
 
 void bloque_init(Bloque *bloque, Sistema *sistema, int given_target);
 
-Bloque *bloque_copy(Bloque *src);
+void bloque_copy(Bloque *src, Bloque *dest);
 
 void minado(int n_threads, Sistema *sistema);
 

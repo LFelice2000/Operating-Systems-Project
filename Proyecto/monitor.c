@@ -18,7 +18,7 @@
 #include "pow.h"
 
 #define BUFFER_SIZE 5
-#define MQ_LEN 7
+#define MQ_LEN 10
 #define MQ_NAME "/mq_monitor"
 #define SHM_NAME "/shm_monitor"
 #define SEM_MQUEUE "/sem_mqueue"
