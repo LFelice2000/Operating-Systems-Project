@@ -7,11 +7,20 @@ all: $(EXE)
 pow.o: pow.c pow.h
 	gcc $(FLAGS) -c pow.c
 
-miner: miner.o pow.o
-	gcc $(FLAGS) -o miner miner.o pow.o $(LIBS)
+bloque.o: bloque.c bloque.h
+	gcc $(FLAGS) -c bloque.c
+
+sistema.o: sistema.c sistema.h
+	gcc $(FLAGS) -c sistema.c
+
+miner_func.o: miner_func.c miner_func.h
+	gcc $(FLAGS) -c miner_func.c
 
 miner.o: miner.c
 	gcc $(FLAGS) -c miner.c
+
+miner: miner.o pow.o bloque.o sistema.o miner_func.o
+	gcc $(FLAGS) -o miner miner.o pow.o bloque.o sistema.o miner_func.o $(LIBS)
 
 monitor: monitor.o pow.o
 	gcc $(FLAGS) -o monitor monitor.o pow.o $(LIBS)

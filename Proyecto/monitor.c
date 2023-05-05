@@ -14,6 +14,8 @@
 #include <sys/wait.h>
 #include <signal.h>
 
+#include "bloque.h"
+#include "miner_func.h"
 #include "monitor.h"
 #include "pow.h"
 
@@ -168,23 +170,14 @@ void comprobador(){
     /* Introduce bloque en memoria compartida */
     while(exit_loop == 0){
 
-        fflush(stdout);
-
-        if(got_SIGINT == 0){
-
-            /* Avisamos al minero de que puede enviar un bloque */
-            sem_post(sem_mqueue);
-
-            /* Recibe el bloque por la cola de mensajes */
-            if (mq_receive(mq, (char *)&bloque, sizeof(Bloque), &prior) == -1)
-            {
-                perror("mq_receive");
-                mq_close(mq);
-                exit(EXIT_FAILURE);
-            }
-
-        }else{
-            bloque.target = -1;
+        /* Avisamos al minero de que puede enviar un bloque */
+        sem_post(sem_mqueue);
+        /* Recibe el bloque por la cola de mensajes */
+        if (mq_receive(mq, (char *)&bloque, sizeof(Bloque), &prior) == -1)
+        {
+            perror("mq_receive");
+            mq_close(mq);
+            exit(EXIT_FAILURE);
         }
         
         /* Comprueba si es el bloque de finalización */
@@ -347,6 +340,12 @@ void clear(){
 
     bloque.target = -1;
 
+    /* Se cierra la cola de mensajes */
+    mq_close(mq);
+
+    /* Se cierra el semáforo */
+    sem_close(sem_mqueue);
+
     /* Espera a que haya espacio en el buffer */
     sem_wait(&shm_struc->sem_empty);
     /* Protegemos el acceso a memoria compartida */
@@ -370,14 +369,6 @@ void clear(){
         perror("munmap");
         exit(EXIT_FAILURE);
     }
-
-    /* Se cierra la cola de mensajes y se elimina porque somos el último proceso en usarla */
-    mq_close(mq);
-    //mq_unlink(MQ_NAME);
-
-    /* Se cierra el semáforo */
-    sem_close(sem_mqueue);
-    //sem_unlink(SEM_MQUEUE);
 
     waitpid(pid, NULL, 0);
 

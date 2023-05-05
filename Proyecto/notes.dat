@@ -103,3 +103,8 @@ ULTIMA COSA:
 
 - proteger la comprobación de que todos los mineros han votado con el mutex 
 
+
+
+/* IMPORTANTE */
+
+- si llega SIGINT o SIGALRM, hay que liberar los recursos relacionados con los hilos
