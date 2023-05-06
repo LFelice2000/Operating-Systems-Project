@@ -1,3 +1,14 @@
+/**
+ * @file miner.c
+ * @author Luis Felice y Angela Valderrama
+ * @brief 
+ * @version 0.1
+ * @date 2023-05-06
+ * 
+ * @copyright Copyright (c) 2023
+ * 
+ */
+
 #include <signal.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -306,8 +317,9 @@ void registrador(){
 
     ssize_t nbytes;
     Bloque bloque;
+    Wallet *wallets;
     char filename[20];
-    int i, file = 0;
+    int i, file = 0, positives, total;
 
     /* Cierre del extremo de escritura del pipe */
     close(fd[1]);
@@ -331,20 +343,23 @@ void registrador(){
 
         if(nbytes > 0){
 
-            dprintf(file, "Id:       %04d\n", bloque.id);
-            dprintf(file, "Winner:   %d\n", bloque.winner);
-            dprintf(file, "Target:   %08d\n", bloque.target);
-            dprintf(file, "Solution: %08d", bloque.solution);
-            if(bloque.positives >= bloque.votes/2){
+            dprintf(file, "Id:       %04d\n", bloque_get_id(&bloque));
+            dprintf(file, "Winner:   %d\n", bloque_get_winner(&bloque));
+            dprintf(file, "Target:   %08d\n", bloque_get_target(&bloque));
+            dprintf(file, "Solution: %08d", bloque_get_solution(&bloque));
+            positives = bloque_get_positives(&bloque);
+            total = bloque_get_votes(&bloque);
+            if(positives >= total/2){
                 dprintf(file, " (validated)\n");
             }else{
                 dprintf(file, " (rejected)\n");
             }
-            dprintf(file, "Votes:    %d/%d\n", bloque.positives, bloque.votes);
+            dprintf(file, "Votes:    %d/%d\n", positives, total);
             dprintf(file, "Wallets:  ");
+            wallets = bloque_get_wallets(&bloque);
             for(i = 0; i < MAX_MINEROS; i++){
-                if(bloque.wallets[i].pid != -1){
-                    dprintf(file, "%d:%02d ", bloque.wallets[i].pid, bloque.wallets[i].coins);
+                if(wallet_get_pid(wallets[i]) != -1){
+                    dprintf(file, "%d:%02d ", wallet_get_pid(wallets[i]), wallet_get_coins(wallets[i]));
                 }
             }
             dprintf(file, "\n\n");

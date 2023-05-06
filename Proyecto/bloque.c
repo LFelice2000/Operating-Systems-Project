@@ -1,3 +1,14 @@
+/**
+ * @file bloque.c
+ * @author Luis Felice y Angela Valderrama
+ * @brief 
+ * @version 0.1
+ * @date 2023-05-06
+ * 
+ * @copyright Copyright (c) 2023
+ * 
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -22,15 +33,15 @@ void wallet_set_pid(Wallet *wallet, int pid){
 
 }
 
-int wallet_get_pid(Wallet *wallet){
+pid_t wallet_get_pid(Wallet wallet){
 
-    return wallet->pid;
+    return wallet.pid;
 
 }
 
-int wallet_get_coins(Wallet *wallet){
+int wallet_get_coins(Wallet wallet){
 
-    return wallet->coins;
+    return wallet.coins;
 
 }
 
@@ -66,26 +77,6 @@ Bloque bloque_init(int id, int target, Wallet *wallets){
     }
 
     return bloque;
-
-}
-
-void bloque_copy(Bloque *src, Bloque *dest){
-
-    int i;
-
-    dest->id = src->id;
-    dest->target = src->target;
-    dest->solution = src->solution;
-    dest->winner = src->winner;
-    dest->votes = src->votes;
-    dest->positives = src->positives;
-    dest->flag = src->flag;
-
-    /* Inicialización de las carteras */
-    for(i = 0; i < MAX_MINEROS; i++){
-        dest->wallets[i].pid = src->wallets[i].pid;
-        dest->wallets[i].coins = src->wallets[i].coins;
-    }
 
 }
 
@@ -219,39 +210,13 @@ int bloque_get_flag(Bloque *bloque){
 
 }
 
-int bloque_get_wallet_coins(Bloque *bloque, pid_t pid){
-
-    int i;
+Wallet *bloque_get_wallets(Bloque *bloque){
 
     if(bloque == NULL){
-        return -1;
+        return NULL;
     }
 
-    for(i = 0; i < MAX_MINEROS; i++){
-        if(bloque->wallets[i].pid == pid){
-            return bloque->wallets[i].coins;
-        }
-    }
+    return bloque->wallets;
 
-    return -1;
-
-}
-
-int bloque_increment_coins(Bloque *bloque, pid_t pid){
-    
-    int i;
-
-    if(bloque == NULL){
-        return -1;
-    }
-
-    for(i = 0; i < MAX_MINEROS; i++){
-        if(bloque->wallets[i].pid == pid){
-            bloque->wallets[i].coins++;
-            return 0;
-        }
-    }
-
-    return -1;
 }
 

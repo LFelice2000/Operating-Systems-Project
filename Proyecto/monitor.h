@@ -1,11 +1,12 @@
-/* @file monitor.h
- * @author Luis Felice and Angela Valderrama.
- * @brief
+/**
+ * @file monitor.h
+ * @author Luis Felice y Angela Valderrama
+ * @brief 
  * @version 0.1
- * @date 2023-03-22
- *
+ * @date 2023-05-06
+ * 
  * @copyright Copyright (c) 2023
- *
+ * 
  */
 
 #ifndef MONITOR_H
@@ -16,7 +17,7 @@
 
 
 /**
- * @brief Estructura a compartir entre procesos
+ * @brief Estructura a compartir entre Comprobador y Monitor
  *
  */
 typedef struct shm_struct
@@ -30,9 +31,16 @@ typedef struct shm_struct
 } shm_struct;
 
 
+/**
+ * @brief Función que ejecuta la lógica del proceso Comprobador
+ * 
+ */
 void comprobador();
 
-
+/**
+ * @brief Función que ejecuta la lógica del proceso Monitor
+ * 
+ */
 void monitor();
 
 /**

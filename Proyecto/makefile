@@ -1,5 +1,5 @@
 EXE = miner monitor
-FLAGS = -g -ansi -pedantic -Wall
+FLAGS = -g -pedantic -Wall
 LIBS = -lpthread -lrt -lm
 
 all: $(EXE)
@@ -22,8 +22,8 @@ miner.o: miner.c
 miner: miner.o pow.o bloque.o sistema.o miner_func.o
 	gcc $(FLAGS) -o miner miner.o pow.o bloque.o sistema.o miner_func.o $(LIBS)
 
-monitor: monitor.o pow.o
-	gcc $(FLAGS) -o monitor monitor.o pow.o $(LIBS)
+monitor: monitor.o pow.o bloque.o
+	gcc $(FLAGS) -o monitor monitor.o pow.o bloque.o $(LIBS)
 
 clean:
 	rm -f *.o $(EXE) *.txt

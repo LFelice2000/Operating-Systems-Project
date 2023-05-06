@@ -1,3 +1,14 @@
+/**
+ * @file sistema.c
+ * @author Luis Felice y Angela Valderrama
+ * @brief 
+ * @version 0.1
+ * @date 2023-05-06
+ * 
+ * @copyright Copyright (c) 2023
+ * 
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <semaphore.h>
@@ -8,7 +19,6 @@
 #include "sistema.h"
 
 #define MAX_MINEROS 100
-
 
 void sistema_init(Sistema *sistema){
 
@@ -124,11 +134,9 @@ int sistema_get_nbloques(Sistema *sistema){
 
 }
 
-int sistema_inc_nbloques(Sistema *sistema){
+void sistema_inc_nbloques(Sistema *sistema){
 
     sistema->n_bloques++;
-
-    return 0;
 
 }
 
@@ -236,11 +244,11 @@ void sistema_update_wallets(Sistema *sistema){
 
         /* El minero ganador, gana una moneda y se guarda en la cartera */
 
-        if(wallet_get_pid(&sistema->current.wallets[i]) == getpid()){
+        if(wallet_get_pid(sistema->current.wallets[i]) == getpid()){
             wallet_inc_coins(&sistema->current.wallets[i]);
         }
 
-        if(wallet_get_pid(&sistema->wallets[i]) == getpid()){
+        if(wallet_get_pid(sistema->wallets[i]) == getpid()){
             wallet_inc_coins(&sistema->wallets[i]);
         }
 

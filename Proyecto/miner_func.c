@@ -1,3 +1,14 @@
+/**
+ * @file miner_func.c
+ * @author Luis Felice y Angela Valderrama
+ * @brief 
+ * @version 0.1
+ * @date 2023-05-06
+ * 
+ * @copyright Copyright (c) 2023
+ * 
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>

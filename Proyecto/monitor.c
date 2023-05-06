@@ -1,3 +1,14 @@
+/**
+ * @file monitor.c
+ * @author Luis Felice y Angela Valderrama
+ * @brief 
+ * @version 0.1
+ * @date 2023-05-06
+ * 
+ * @copyright Copyright (c) 2023
+ * 
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -181,7 +192,7 @@ void comprobador(){
         }
         
         /* Comprueba si es el bloque de finalización */
-        if (bloque.target == -1)
+        if (bloque_get_target(&bloque) == -1)
         {
             exit_loop = 1;
         }
@@ -191,7 +202,7 @@ void comprobador(){
             flag = comprobar(bloque.target, bloque.solution);
 
             /* Preparar mensaje para enviar */
-            bloque.flag = flag;
+            bloque_set_flag(&bloque, flag);
 
         }
 
@@ -236,6 +247,7 @@ void comprobador(){
 void monitor(){
 
     Bloque bloque;
+    Wallet *wallets;
     int end_loop = 0, i;
 
     /* Preparar señal SIGINT */
@@ -268,7 +280,7 @@ void monitor(){
 
         /* Comprueba si es el bloque de finalización */
         bloque = shm_struc->buffer[shm_struc->front];
-        if (bloque.target == -1)
+        if (bloque_get_target(&bloque) == -1)
         {
             end_loop = 1;
         }
@@ -276,11 +288,11 @@ void monitor(){
         {
             /* Leer objetivo y solución */
 
-            printf("Id:       %04d\n", bloque.id);
-            printf("Winner:   %d\n", bloque.winner);
-            printf("Target:   %08d\n", bloque.target);
-            printf("Solution: %08d", bloque.solution);
-            if (bloque.flag == 1)
+            printf("Id:       %04d\n", bloque_get_id(&bloque));
+            printf("Winner:   %d\n", bloque_get_winner(&bloque));
+            printf("Target:   %08d\n", bloque_get_target(&bloque));
+            printf("Solution: %08d", bloque_get_solution(&bloque));
+            if (bloque_get_flag(&bloque) == 1)
             {
                 printf(" (validated)\n");
             }
@@ -289,11 +301,12 @@ void monitor(){
                 printf(" (rejected)\n");
             }
 
-            printf("Votes:    %d/%d\n", bloque.positives, bloque.votes);
+            printf("Votes:    %d/%d\n", bloque_get_positives(&bloque), bloque_get_votes(&bloque));
             printf("Wallets:  ");
+            wallets = bloque_get_wallets(&bloque);
             for(i = 0; i < MAX_MINEROS; i++){
-                if(bloque.wallets[i].pid != -1){
-                    printf("%d:%02d ", bloque.wallets[i].pid, bloque.wallets[i].coins);
+                if(wallet_get_pid(wallets[i]) != -1){
+                    printf("%d:%02d ", wallet_get_pid(wallets[i]), wallet_get_coins(wallets[i]));
                 }
             }
             printf("\n\n");
