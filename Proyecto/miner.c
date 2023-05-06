@@ -1,7 +1,8 @@
-#include <stdio.h>
+#include <signal.h>
 #include <stdlib.h>
-#include <string.h>
+#include <stdio.h>
 #include <unistd.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
@@ -9,7 +10,6 @@
 #include <semaphore.h>
 #include <pthread.h>
 #include <time.h>
-#include <signal.h>
 #include <errno.h>
 #include <mqueue.h>
 #include <math.h>
@@ -25,7 +25,6 @@
 #define SEM_MQUEUE "/sem_mqueue"
 #define SHM_NAME "/shm_sistema"
 
-#define MQ_LEN 7
 #define MQ_NAME "/mq_monitor"
 
 int found = 0;
@@ -42,7 +41,7 @@ sem_t *sem_mqueue;
 
 Sistema *sistema = NULL;
 
-sigset_t set, oldset;
+sigset_t set, oldset, intset;
 
 mqd_t mq;
 
@@ -101,6 +100,8 @@ int main(int argc, char *argv[]){
         printf("[ERROR] No se ha podido crear el proceso Registrador\n");
         exit(EXIT_FAILURE);
     }
+
+    exit(EXIT_SUCCESS);
 
 }
 
@@ -201,12 +202,18 @@ void minero(int n_threads, int n_seconds){
         /* Desbloquear SIGUSR2 para que pueda ser recibida */
         sigprocmask(SIG_UNBLOCK, &set, &oldset);
 
+        /* Bloquear SIGINT y SIGALRM que están en intset */
+        sigprocmask(SIG_BLOCK, &intset, &oldset);
+
         /* Minado hasta que sea el primero en encontrar la solución */
         minado(n_threads);
 
         found = 0;
 
-        /* Bloquear la máscara de señales */
+        /* Desbloquear SIGINT y SIGALRM */
+        sigprocmask(SIG_UNBLOCK, &intset, &oldset); 
+
+        /* Bloquear SIGUSR1 y SIGUSR2 */
         sigprocmask(SIG_BLOCK, &set, &oldset);
 
         /* Intento de proclamación de ganador */
@@ -248,6 +255,9 @@ void minero(int n_threads, int n_seconds){
 
             sem_post(&sistema->mutex);
 
+            /* Liberar el semáforo winner */
+            sem_post(sem_winner);
+
             sem_wait(&sistema->mutex);
 
             /* Enviar último bloque resuelto al Registrador */
@@ -257,8 +267,6 @@ void minero(int n_threads, int n_seconds){
 
             got_SIGUSR1 = 1;
 
-            /* Liberar el semáforo winner */
-            sem_post(sem_winner);
 
         }else{
 
@@ -364,6 +372,10 @@ void signals(int n_seconds){
     sigemptyset(&set);
     sigaddset(&set, SIGUSR1);
     sigaddset(&set, SIGUSR2);
+
+    sigemptyset(&intset);
+    sigaddset(&intset, SIGINT);
+    sigaddset(&intset, SIGALRM);
 
     sigprocmask(SIG_BLOCK, &set, &oldset);
 

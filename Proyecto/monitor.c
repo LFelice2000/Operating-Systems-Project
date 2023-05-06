@@ -338,6 +338,9 @@ void clear(){
 
     Bloque bloque;
 
+    /* Bajamos el semáforo de la cola de mensajes para que no se pueda escribir en ella */
+    sem_wait(sem_mqueue);
+
     bloque.target = -1;
 
     /* Se cierra la cola de mensajes */

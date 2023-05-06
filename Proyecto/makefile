@@ -1,5 +1,5 @@
 EXE = miner monitor
-FLAGS = -g -pedantic -Wall -pedantic
+FLAGS = -g -ansi -pedantic -Wall
 LIBS = -lpthread -lrt -lm
 
 all: $(EXE)
@@ -27,3 +27,8 @@ monitor: monitor.o pow.o
 
 clean:
 	rm -f *.o $(EXE) *.txt
+	rm -f /dev/shm/sem.sem_minero
+	rm -f /dev/shm/sem.sem_mqueue
+	rm -f /dev/shm/sem.sem_winner
+	rm -f /dev/shm/shm_monitor
+	rm -f /dev/shm/shm_sistema

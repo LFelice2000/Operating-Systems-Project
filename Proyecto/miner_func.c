@@ -10,7 +10,6 @@
 #include <semaphore.h>
 #include <errno.h>
 
-
 #include "miner_func.h"
 #include "pow.h"
 
