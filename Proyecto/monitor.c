@@ -1,12 +1,12 @@
 /**
  * @file monitor.c
  * @author Luis Felice y Angela Valderrama
- * @brief 
+ * @brief
  * @version 0.1
  * @date 2023-05-06
- * 
+ *
  * @copyright Copyright (c) 2023
- * 
+ *
  */
 
 #include <stdio.h>
@@ -50,22 +50,28 @@ sem_t *sem_mqueue;
 struct mq_attr attributes;
 mqd_t mq;
 
-void handler(int sig){
-    if(sig == SIGINT){
+void handler(int sig)
+{
+    if (sig == SIGINT)
+    {
         got_SIGINT = 1;
         clear();
         exit(EXIT_SUCCESS);
     }
 }
 
-int main(int argc, char *argv[]){
+int main(int argc, char *argv[])
+{
 
     /* El proceso Comprobador crea el segmento de memoria compartida */
     fd_shm = shm_open(SHM_NAME, O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
-    if(fd_shm == -1){
-        if(errno == EEXIST){
+    if (fd_shm == -1)
+    {
+        if (errno == EEXIST)
+        {
             fd_shm = shm_open(SHM_NAME, O_RDWR, 0);
-            if(fd_shm == -1){
+            if (fd_shm == -1)
+            {
                 perror("Error opening the shared memory segment\n");
                 exit(EXIT_FAILURE);
             }
@@ -95,23 +101,27 @@ int main(int argc, char *argv[]){
 
     /* Crear proceso Monitor */
     pid = fork();
-    if(pid == -1){
+    if (pid == -1)
+    {
         perror("fork");
         shm_unlink(SHM_NAME);
         exit(EXIT_FAILURE);
     }
-    else if(pid == 0){
+    else if (pid == 0)
+    {
         monitor();
         exit(EXIT_SUCCESS);
-    }else{
+    }
+    else
+    {
         comprobador();
         waitpid(pid, NULL, 0);
-        if(got_SIGINT == 1){
+        if (got_SIGINT == 1)
+        {
             exit(EXIT_FAILURE);
         }
         exit(EXIT_SUCCESS);
     }
-
 }
 
 void init_struct(shm_struct *shm_struc)
@@ -144,16 +154,17 @@ void init_struct(shm_struct *shm_struc)
         perror("sem_init");
         exit(EXIT_FAILURE);
     }
-
 }
 
-void comprobador(){
+void comprobador()
+{
 
     int exit_loop = 0, prior, flag, value;
     Bloque bloque;
 
     sem_mqueue = sem_open(SEM_MQUEUE, O_CREAT, S_IRUSR | S_IWUSR, 0);
-    if(sem_mqueue == SEM_FAILED){
+    if (sem_mqueue == SEM_FAILED)
+    {
         perror("sem_open");
         exit(EXIT_FAILURE);
     }
@@ -163,7 +174,8 @@ void comprobador(){
     sigemptyset(&act.sa_mask);
     act.sa_flags = 0;
 
-    if (sigaction(SIGINT, &act, NULL) == -1){
+    if (sigaction(SIGINT, &act, NULL) == -1)
+    {
         perror("sigaction");
         exit(EXIT_FAILURE);
     }
@@ -173,13 +185,15 @@ void comprobador(){
     attributes.mq_msgsize = sizeof(Bloque);
 
     /* Abrir cola de mensajes */
-    if ((mq = mq_open(MQ_NAME, O_CREAT | O_RDONLY , S_IRUSR | S_IWUSR, &attributes)) == (mqd_t) -1) {
-        perror("mq_open") ;
-        exit(EXIT_FAILURE) ;
+    if ((mq = mq_open(MQ_NAME, O_CREAT | O_RDONLY, S_IRUSR | S_IWUSR, &attributes)) == (mqd_t)-1)
+    {
+        perror("mq_open");
+        exit(EXIT_FAILURE);
     }
 
     /* Introduce bloque en memoria compartida */
-    while(exit_loop == 0){
+    while (exit_loop == 0)
+    {
 
         /* Avisamos al minero de que puede enviar un bloque */
         sem_post(sem_mqueue);
@@ -190,7 +204,7 @@ void comprobador(){
             mq_close(mq);
             exit(EXIT_FAILURE);
         }
-        
+
         /* Comprueba si es el bloque de finalización */
         if (bloque_get_target(&bloque) == -1)
         {
@@ -203,7 +217,6 @@ void comprobador(){
 
             /* Preparar mensaje para enviar */
             bloque_set_flag(&bloque, flag);
-
         }
 
         /* Espera a que haya espacio en el buffer */
@@ -224,7 +237,6 @@ void comprobador(){
 
         sem_post(&shm_struc->sem_mutex);
         sem_post(&shm_struc->sem_fill);
-
     }
 
     /* Se desasocia el segmento de memoria compartida */
@@ -241,10 +253,10 @@ void comprobador(){
     /* Se cierra el semáforo */
     sem_close(sem_mqueue);
     sem_unlink(SEM_MQUEUE);
-
 }
 
-void monitor(){
+void monitor()
+{
 
     Bloque bloque;
     Wallet *wallets;
@@ -255,7 +267,8 @@ void monitor(){
     sigemptyset(&act.sa_mask);
     act.sa_flags = 0;
 
-    if (sigaction(SIGINT, &act, NULL) == -1){
+    if (sigaction(SIGINT, &act, NULL) == -1)
+    {
         perror("sigaction");
         exit(EXIT_FAILURE);
     }
@@ -304,8 +317,10 @@ void monitor(){
             printf("Votes:    %d/%d\n", bloque_get_positives(&bloque), bloque_get_votes(&bloque));
             printf("Wallets:  ");
             wallets = bloque_get_wallets(&bloque);
-            for(i = 0; i < MAX_MINEROS; i++){
-                if(wallet_get_pid(wallets[i]) != -1){
+            for (i = 0; i < MAX_MINEROS; i++)
+            {
+                if (wallet_get_pid(wallets[i]) != -1)
+                {
                     printf("%d:%02d ", wallet_get_pid(wallets[i]), wallet_get_coins(wallets[i]));
                 }
             }
@@ -314,7 +329,6 @@ void monitor(){
 
         sem_post(&shm_struc->sem_mutex);
         sem_post(&shm_struc->sem_empty);
-
     }
 
     /* Se destruyen los semáforos sin nombre porque somos el último proceso en usarlos */
@@ -323,7 +337,7 @@ void monitor(){
     sem_destroy(&shm_struc->sem_fill);
 
     /* Se desasocia el segmento de memoria compartida */
-    if(munmap(shm_struc, sizeof(shm_struct)) == -1)
+    if (munmap(shm_struc, sizeof(shm_struct)) == -1)
     {
         perror("munmap");
         exit(EXIT_FAILURE);
@@ -331,7 +345,6 @@ void monitor(){
     shm_unlink(SHM_NAME);
 
     return;
-
 }
 
 int comprobar(int target, int res)
@@ -347,7 +360,8 @@ int comprobar(int target, int res)
     return flag;
 }
 
-void clear(){
+void clear()
+{
 
     Bloque bloque;
 
@@ -387,5 +401,4 @@ void clear(){
     }
 
     waitpid(pid, NULL, 0);
-
 }

@@ -1,12 +1,12 @@
 /**
  * @file monitor.h
  * @author Luis Felice y Angela Valderrama
- * @brief 
+ * @brief
  * @version 0.1
  * @date 2023-05-06
- * 
+ *
  * @copyright Copyright (c) 2023
- * 
+ *
  */
 
 #ifndef MONITOR_H
@@ -14,7 +14,6 @@
 
 #include <semaphore.h>
 #include "miner.h"
-
 
 /**
  * @brief Estructura a compartir entre Comprobador y Monitor
@@ -30,16 +29,15 @@ typedef struct shm_struct
     int rear;
 } shm_struct;
 
-
 /**
  * @brief Función que ejecuta la lógica del proceso Comprobador
- * 
+ *
  */
 void comprobador();
 
 /**
  * @brief Función que ejecuta la lógica del proceso Monitor
- * 
+ *
  */
 void monitor();
 
